@@ -1,0 +1,4 @@
+*.suo
+tags
+obj/
+bin/

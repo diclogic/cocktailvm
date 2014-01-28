@@ -1,0 +1,28 @@
+Detected configuration: Windows / .Net
+DisplayDevice 1 (primary) supports 126 resolutions.
+DisplayDevice 2 (secondary) supports 162 resolutions.
+Creating default GraphicsMode (32, 16, 0, 0, 0, 2, False).
+Creating GraphicsContext.
+    GraphicsMode: Index: 2, Color: 0 (0000), Depth: 0, Stencil: 0, Samples: 0, Accum: 0 (0000), Buffers: 2, Stereo: False
+    IWindowInfo: Windows.WindowInfo: Handle 68548, Parent (Windows.WindowInfo: Handle 68546, Parent (null))
+    GraphicsContextFlags: Default
+    Requested version: 1.0
+    Loaded opengl32.dll: 8791399989248
+    OpenGL will be bound to window:68548 on thread:10
+    Setting pixel format... 2
+    Creating temporary context for wgl extensions.
+    Load extensions for OpenTK.Platform.Windows.Wgl... 50 extensions loaded in 19 ms.
+    Using WGL_ARB_create_context... success! (id: 131072)
+Retrieving ARB pixel formats.... Disposing context 131072.
+Destroying window: Windows.WindowInfo: Handle 68546, Parent (null)
+Creating GraphicsContext.
+    GraphicsMode: Index: 14, Color: 32 (8888), Depth: 24, Stencil: 0, Samples: 0, Accum: 64 (16161616), Buffers: 2, Stereo: False
+    IWindowInfo: Windows.WindowInfo: Handle 134084, Parent (null)
+    GraphicsContextFlags: Default
+    Requested version: 1.0
+    OpenGL will be bound to window:134084 on thread:10
+    Setting pixel format... 14
+    Using WGL_ARB_create_context... success! (id: 196608)
+Load extensions for OpenTK.Platform.Windows.Wgl... 50 extensions loaded in 1 ms.
+Loading extensions for OpenTK.Graphics.OpenGL.GL... 2279 extensions loaded in 389.9199 ms.
+Disposing context 196608.
