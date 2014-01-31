@@ -47,7 +47,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Accounting.cs" />
-    <Compile Include="Cooktail.cs" />
+    <Compile Include="Cocktail.cs" />
     <Compile Include="IEvent.cs" />
     <Compile Include="IIdentity.cs">
       <SubType>Code</SubType>
