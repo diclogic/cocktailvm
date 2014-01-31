@@ -12,9 +12,9 @@ namespace CollisionTest
     {
         static Random m_seed = new Random();
         public UInt64 StateId { get; protected set; }
-        public TimeStamp LatestUpdate;
+        public IHierarchicalTimestamp LatestUpdate;
 
-        public State(TimeStamp stamp)
+        public State(IHierarchicalTimestamp stamp)
         {
             StateId = (ulong)m_seed.Next();
             LatestUpdate = stamp;

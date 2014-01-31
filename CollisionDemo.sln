@@ -4,6 +4,9 @@ Microsoft Visual Studio Solution File, Format Version 11.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Collision", "Collision.csproj", "{C318BDB0-D222-47E4-8839-017459FE48F2}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Representation", "Representation\Representation.csproj", "{D037F0C4-144B-443B-8DEC-14A0540BBC87}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D42AA6CC-660E-48BA-921D-63BA35847DD1} = {D42AA6CC-660E-48BA-921D-63BA35847DD1}
+	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MathLib", "MathLib\MathLib.csproj", "{B6DCD891-699A-4E04-98BA-565C9C7D8A64}"
 EndProject

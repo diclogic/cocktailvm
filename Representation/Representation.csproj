@@ -61,6 +61,7 @@
       <DependentUpon>Form1.cs</DependentUpon>
     </Compile>
     <Compile Include="IModel.cs" />
+    <Compile Include="NumericalDemo.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Renderer.cs" />
@@ -90,6 +91,10 @@
     <ProjectReference Include="..\Collision.csproj">
       <Project>{C318BDB0-D222-47E4-8839-017459FE48F2}</Project>
       <Name>Collision</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\ITCSharp\ITCSharp.csproj">
+      <Project>{D42AA6CC-660E-48BA-921D-63BA35847DD1}</Project>
+      <Name>ITCSharp</Name>
     </ProjectReference>
     <ProjectReference Include="..\MathLib\MathLib.csproj">
       <Project>{B6DCD891-699A-4E04-98BA-565C9C7D8A64}</Project>

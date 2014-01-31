@@ -5,6 +5,8 @@ using System.Diagnostics;
 using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
+using System.Collections;
+using System.Linq;
 
 namespace itcsharp
 {
@@ -63,6 +65,52 @@ namespace itcsharp
             if (IsSimplex())
                 return bit.ToString();
             return "(" + Left + ", " + Right + ")";
+        }
+
+        public int GetSize()
+        {
+            if (IsSimplex())
+                return 1;
+
+            return Left.GetSize() + Right.GetSize();
+        }
+
+        public int GetMaxDepth()
+        {
+            if (IsSimplex())
+                return 1;
+            return Math.Max(Left.GetMaxDepth(), Right.GetMaxDepth()) + 1;
+        }
+
+        // abstract the "color" of the sub tree
+        // TODO: 
+        private float GetColor()
+        {
+            if (IsSimplex())
+                return (float)bit;
+            return (Left.GetColor() + Right.GetColor()) * 0.5f;
+        }
+
+        public BitArray ToBitArray(int maxDepth)
+        {
+            var ret = GetBitsRecurrsively(maxDepth);
+            return new BitArray(ret.ToArray());
+        }
+
+        private List<bool> GetBitsRecurrsively(int predictedDepth)
+        {
+            if (IsSimplex())
+            {
+                return Enumerable.Repeat(bit != 0, 1 << (predictedDepth - 1)).ToList();
+            }
+            if (predictedDepth == 1)
+                return new List<bool>() { GetColor() > 0.5 };
+
+            var retval = Left.GetBitsRecurrsively(predictedDepth - 1);
+            retval.Capacity += 1 << predictedDepth;
+            retval.AddRange(Right.GetBitsRecurrsively(predictedDepth - 1));
+
+            return retval;
         }
 
         public object Clone()
@@ -149,5 +197,6 @@ namespace itcsharp
             if ((Left == null) ^ (Right == null))
                 throw new ChildNodeInconsistantException();
         }
+
     }
 }

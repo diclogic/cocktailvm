@@ -27,7 +27,8 @@ namespace Representation
 
             m_renderer = new Renderer(this.glControl1);
             //m_model = new BounceModel();
-            m_model = new CollisionDemo();
+            //m_model = new CollisionDemo();
+			m_model = new NumericalDemo();
             m_renderer.Model = m_model;
 
             this.Resize += (_,__) => 

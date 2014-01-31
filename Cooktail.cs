@@ -19,7 +19,7 @@ namespace CollisionTest
 		public Vector3 accel = new Vector3(0, 0, 0);
 		public Vector3 velocity = new Vector3(0, 0, 0);
 
-        public Particle(TimeStamp creationStamp)
+        public Particle(IHierarchicalTimestamp creationStamp)
             : base(creationStamp)
         {
 

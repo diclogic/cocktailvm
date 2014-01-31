@@ -27,8 +27,8 @@ namespace Representation
         public void Init(AABB worldBox)
         {
             m_worldBox = worldBox;
-            for (int ii = 0; ii < 10; ++ii )
-                m_particles.Add(new Particle() { pt = worldBox.RandomPoint(m_rand) });
+            //for (int ii = 0; ii < 10; ++ii )
+            //    m_particles.Add(new Particle(new ITCTimestamp()) { pt = worldBox.RandomPoint(m_rand) });
 
             // declare a function form for an event, which also means binding an event to one or a few state types
             kernel.Declare("GodPush"

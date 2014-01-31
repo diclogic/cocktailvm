@@ -16,13 +16,16 @@ namespace itcsharp
         private readonly Identity m_id;
         private readonly Event m_event;
 
+        public Identity ID { get { return m_id; } }
+        public Event Event { get { return m_event; } }
+
         public TimeStamp()
         {
             m_id = Identity.ONE;
             m_event = new Event(0);
         }
 
-        internal TimeStamp(Identity id, Event eventIn)
+        public TimeStamp(Identity id, Event eventIn)
         {
             this.m_id = id;
             this.m_event = eventIn;
