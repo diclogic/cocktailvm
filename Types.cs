@@ -3,7 +3,7 @@ using System.Text;
 using OpenTK;
 using OpenTK.Graphics;
 
-namespace CollisionTest
+namespace Common
 {
     public static class Vector3Extension
     {

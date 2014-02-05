@@ -8,6 +8,8 @@ using OpenTK;
 using OpenTK.Graphics;
 using OpenTK.Graphics.OpenGL;
 using MathLib;
+using Cocktail;
+using HTS;
 
 namespace Representation
 {
@@ -30,10 +32,10 @@ namespace Representation
 		{
 			m_worldBox = worldBox;
 
-			m_initialST = new SpaceTime(m_idFactory.CreateFromRoot(), m_idFactory);
-			var newAccount = m_initialST.CreateState((stamp) => new Account(stamp));
+			m_initialST = new SpaceTime(m_idFactory.CreateFromRoot(), ITCEvent.CreateZero(), m_idFactory);
+			var newAccount = m_initialST.CreateState((st, stamp) => new Account(st, stamp));
 			m_accounts.Add(newAccount as Account);
-			newAccount = m_initialST.CreateState((stamp) => new Account(stamp));
+			newAccount = m_initialST.CreateState((st, stamp) => new Account(st, stamp));
 			m_accounts.Add(newAccount as Account);
 
 			//kernel.Declare("CreateAccount"
@@ -54,7 +56,7 @@ namespace Representation
 
 			foreach (var acc in m_accounts)
 			{
-				kernel.Call("Initiate", Utils.MakeArgList("account", acc), 900);
+				kernel.Call("Initiate", m_initialST, Utils.MakeArgList("account", acc), 900);
 			}
 		}
 
@@ -62,7 +64,7 @@ namespace Representation
 		{
 			if (m_elapsed > 2 && m_pushFlag)
 			{
-				kernel.Call("Transfer", Utils.MakeArgList("fromAcc", m_accounts[0], "toAcc", m_accounts[1]), m_rand.Next(50));
+				kernel.Call("Transfer", m_initialST, Utils.MakeArgList("fromAcc", m_accounts[0], "toAcc", m_accounts[1]), m_rand.Next(50));
 			}
 		}
 

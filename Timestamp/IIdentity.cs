@@ -14,7 +14,7 @@ using System.Diagnostics;
 /// Wrapper for itc library
 /// 
 
-namespace CollisionTest
+namespace HTS
 {
     public interface IHierarchicalId : IComparable
     {
@@ -24,7 +24,13 @@ namespace CollisionTest
     public interface IHierarchicalIdFactory
     {
         IHierarchicalId CreateFromRoot();
+		IEnumerable<IHierarchicalId> CreateFromRoot(int count);
         IHierarchicalId CreateSiblingsOf(IHierarchicalId elderBrother);
+		IEnumerable<IHierarchicalId> CreateSiblingsOf(IHierarchicalId elderBrother, int count);
+		/// <summary>
+		/// Create/split a node into many nodes that are expected to be merged later
+		/// </summary>
+		IEnumerable<IHierarchicalId> CreateChildren(IHierarchicalId parent, int count);
     }
 
     public static class HierarchicalIdService
@@ -147,23 +153,28 @@ namespace CollisionTest
                 throw new ApplicationException("ITCIdentityFactory being dereferenced while constructing");
         }
 
-        public IHierarchicalId CreateFromRoot()
+		public IHierarchicalId CreateFromRoot()
+		{
+			return CreateChildren(m_root, 1).First();
+		}
+
+        public IEnumerable<IHierarchicalId> CreateFromRoot(int count)
         {
-            return CreateSiblingsOf(m_root);
+            return CreateChildren(m_root, count);
         }
 
-        public IHierarchicalId CreateSiblingsOf(IHierarchicalId elderBrother)
-        {
-            return CreateSiblingsOf(elderBrother, BATCH_SIZE);
-        }
+		public IHierarchicalId CreateChild(IHierarchicalId parent)
+		{
+			return CreateChildren(parent, 1).First();
+		}
 
-        public IHierarchicalId CreateSiblingsOf(IHierarchicalId elderBrother, uint batchSize)
-        {
-            ITCIdentity itcEB = elderBrother as ITCIdentity;
-            if (itcEB == null)
-                return null;
+		public IEnumerable<IHierarchicalId> CreateChildren(IHierarchicalId parent, int count)
+		{
+			var itcParent = parent as ITCIdentity;
+			if (itcParent == null)
+                throw new ArgumentException("The source Id was not from this factory");
 
-			var itcParent = itcEB.GetCausalParent();
+			uint batchSize = Math.Max(BitOps.RoundUp((uint)count), BATCH_SIZE);
 
             var entry = m_freelist.GetOrAdd(itcParent.GetImpl(), (_) =>
             {
@@ -174,7 +185,7 @@ namespace CollisionTest
 
             lock (entry.entryLock)
             {
-                if (entry.remains.Count <= 0)
+                if (entry.remains.Count <= count)
                 // plant a seed
                 {
                     var seeds = entry.seeds;
@@ -187,11 +198,25 @@ namespace CollisionTest
                 }
 
                 // consume a free node
-                Debug.Assert(entry.remains.Count > 0);
-                var retval = entry.remains[entry.remains.Count - 1];
-                entry.remains.RemoveAt(entry.remains.Count - 1);
+				var retval = entry.remains.GetRange(0, count);
+				entry.remains.RemoveRange(0, count);
                 return retval;
             }
+		}
+
+        public IHierarchicalId CreateSiblingsOf(IHierarchicalId elderBrother)
+        {
+			return CreateSiblingsOf(elderBrother, 1).First();
+        }
+
+        public IEnumerable<IHierarchicalId> CreateSiblingsOf(IHierarchicalId elderBrother, int count)
+        {
+            ITCIdentity itcEB = elderBrother as ITCIdentity;
+            if (itcEB == null)
+                throw new ArgumentException("The source Id was not from this factory");
+
+			var itcParent = itcEB.GetCausalParent();
+			return CreateChildren(itcParent, count);
         }
 
         // expand in the sibling tree style
@@ -203,10 +228,12 @@ namespace CollisionTest
                 all.RemoveRange(0,1);
                 return new FreelistEntry() {seeds = seeds, remains = all};
         }
+
         private FreelistEntry ExpandSeed(ITCIdentity seed, uint batchSize)
         {
             return Expand(seed, seed.GetCausalParent(), batchSize);
         }
+
         private FreelistEntry CausallyExpand(ITCIdentity parent, uint batchSize)
         {
             return Expand(parent, parent, batchSize);

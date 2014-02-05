@@ -6,9 +6,11 @@ using OpenTK;
 using OpenTK.Graphics;
 using System.Reflection;
 using itcsharp;
+using HTS;
+using Common;
 
 
-namespace CollisionTest
+namespace Cocktail
 {
 	[State]
 	public class Particle : State
@@ -19,8 +21,8 @@ namespace CollisionTest
 		public Vector3 accel = new Vector3(0, 0, 0);
 		public Vector3 velocity = new Vector3(0, 0, 0);
 
-        public Particle(IHierarchicalTimestamp creationStamp)
-            : base(creationStamp)
+        public Particle(SpaceTime spaceTime, IHierarchicalTimestamp creationStamp)
+            : base(spaceTime, creationStamp)
         {
 
         }
@@ -84,7 +86,7 @@ namespace CollisionTest
 			m_fn = fn;
 			m_form = form;
 		}
-		public void Exec(IEnumerable<StateParamInst> states, List<object> constArgs)
+		public void Exec(IEnumerable<StateParamInst> states, IEnumerable<object> constArgs)
 		{
 			if (!m_form.Check(states, constArgs))
 				throw new ApplicationException("The invocation doesn't match the form of the event declaration");
@@ -413,7 +415,7 @@ namespace CollisionTest
             }
         }
 
-		public void Call(string eventName, IEnumerable<KeyValuePair<string, State>> states, params object[] constArgs)
+		public void Call(string eventName, SpaceTime mainST, IEnumerable<KeyValuePair<string, State>> states, params object[] constArgs)
 		{
             var sign = Match(eventName
                 , GenStateParams(states)
@@ -423,7 +425,7 @@ namespace CollisionTest
             if (!m_functionBodies.TryGetValue(sign, out func))
 				return;
 
-			func.Exec(GenStateParamInsts(states), constArgs.ToList());
+			mainST.Execute(func, GenStateParamInsts(states), constArgs);
 		}
 
 
