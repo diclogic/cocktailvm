@@ -65,9 +65,56 @@ namespace Cocktail
 		#endregion
 	}
 
+	public abstract class StateRef
+	{
+		private Type m_refType;
+		public TStateId StateId { get; private set; }
+		protected StateRef(TStateId stateId, Type refType)
+		{
+			StateId = stateId;
+			m_refType = refType;
+		}
+		public Type GetRefType() { return m_refType; }
+		//public virtual object GetInterface() { return null; }
+	}
+
+	public abstract class StateRefT<T>: StateRef
+		where T : class
+	{
+		protected StateRefT(TStateId stateId)
+			: base(stateId, typeof(T))
+		{
+
+		}
+
+		//public virtual T GetInterface() { return null; }
+	}
+
+	public class LocalStateRef<T> : StateRefT<T>
+		where T : State
+	{
+		State m_impl;
+
+		public LocalStateRef(T impl)
+			:base(impl.StateId)
+		{
+			m_impl = impl;
+		}
+
+		public T GetInterface()
+		{
+			return (T)m_impl;
+		}
+	}
+
+	public class RemoteStateRef<T> : StateRefT<T>
+	{
+
+	}
+
 	public class StateParamInst : StateParam
 	{
-		public State arg;
+		public StateRef arg;
 	}
 
 	public delegate List<Vector3> CollideDeleg(IEnumerable<StateParamInst> states, EStyle style);
@@ -281,11 +328,11 @@ namespace Cocktail
 
 	public static class Utils
 	{
-		public static IEnumerable<KeyValuePair<string, State>> MakeArgList(params object[] args)
+		public static IEnumerable<KeyValuePair<string, StateRef>> MakeArgList(params object[] args)
 		{
 			for (int i = 0; i < args.Length; i += 2)
 			{
-				yield return new KeyValuePair<string, State>((string)args[i], (State)args[i + 1]);
+				yield return new KeyValuePair<string, StateRef>((string)args[i], (StateRef)args[i + 1]);
 			}
 		}
 	}
@@ -415,7 +462,7 @@ namespace Cocktail
             }
         }
 
-		public void Call(string eventName, SpaceTime mainST, IEnumerable<KeyValuePair<string, State>> states, params object[] constArgs)
+		public void Call(string eventName, SpaceTime mainST, IEnumerable<KeyValuePair<string, StateRef>> states, params object[] constArgs)
 		{
             var sign = Match(eventName
                 , GenStateParams(states)
@@ -446,20 +493,20 @@ namespace Cocktail
         }
 
 
-		IEnumerable<StateParamInst> GenStateParamInsts(IEnumerable<KeyValuePair<string, State>> states)
+		IEnumerable<StateParamInst> GenStateParamInsts(IEnumerable<KeyValuePair<string, StateRef>> states)
 		{
 			foreach (var sp in states)
 			{
-				var param = new StateParamInst() { name = sp.Key, type = sp.Value.GetType(), arg = sp.Value };
+				var param = new StateParamInst() { name = sp.Key, type = sp.Value.GetRefType(), arg = sp.Value };
 				yield return param;
 			}
 		}
 
-		IEnumerable<StateParam> GenStateParams(IEnumerable<KeyValuePair<string, State>> states)
+		IEnumerable<StateParam> GenStateParams(IEnumerable<KeyValuePair<string, StateRef>> states)
 		{
 			foreach (var sp in states)
 			{
-				var param = new StateParam() { name = sp.Key, type = sp.Value.GetType()};
+				var param = new StateParam() { name = sp.Key, type = sp.Value.GetRefType()};
 				yield return param;
 			}
 		}

@@ -22,6 +22,7 @@ namespace Representation
 		double m_accumulate = 0;
 		Random m_rand = new Random();
 		SpaceTime m_initialST;
+		SpaceTime m_secondST;
 		IHierarchicalIdFactory m_idFactory = HierarchicalIdService.GetFactory();
 
 		// trival
@@ -35,15 +36,15 @@ namespace Representation
 			m_initialST = new SpaceTime(m_idFactory.CreateFromRoot(), ITCEvent.CreateZero(), m_idFactory);
 			var newAccount = m_initialST.CreateState((st, stamp) => new Account(st, stamp));
 			m_accounts.Add(newAccount as Account);
-			newAccount = m_initialST.CreateState((st, stamp) => new Account(st, stamp));
+			m_secondST = new SpaceTime(m_idFactory.CreateFromRoot(), ITCEvent.CreateZero(), m_idFactory);
+			newAccount = m_secondST.CreateState((st, stamp) => new Account(st, stamp));
 			m_accounts.Add(newAccount as Account);
 
-			//kernel.Declare("CreateAccount"
-			//                , FunctionForm.From(typeof(Accounting).GetMethod("CreateAccount")));
 
-			kernel.Declare("Initiate", FunctionForm.From(typeof(Accounting).GetMethod("Initiate")));
 			// declare a function form for an event, which also means binding an event to one or a few state types
+			kernel.Declare("Initiate", FunctionForm.From(typeof(Accounting).GetMethod("Initiate")));
 			kernel.Declare("Transfer", FunctionForm.From(typeof(Accounting).GetMethod("Transfer")));
+			//kernel.Declare("CreateAccount", FunctionForm.From(typeof(Accounting).GetMethod("CreateAccount")));
 
 			//foreach (var p in m_particles)
 			//{
@@ -56,7 +57,7 @@ namespace Representation
 
 			foreach (var acc in m_accounts)
 			{
-				kernel.Call("Initiate", m_initialST, Utils.MakeArgList("account", acc), 900);
+				kernel.Call("Initiate", m_initialST, Utils.MakeArgList("account", new LocalStateRef<Account>(acc)), 900);
 			}
 		}
 
@@ -64,7 +65,10 @@ namespace Representation
 		{
 			if (m_elapsed > 2 && m_pushFlag)
 			{
-				kernel.Call("Transfer", m_initialST, Utils.MakeArgList("fromAcc", m_accounts[0], "toAcc", m_accounts[1]), m_rand.Next(50));
+				kernel.Call("Transfer", m_initialST, Utils.MakeArgList(
+					"fromAcc", new LocalStateRef<Account>(m_accounts[0])
+					, "toAcc", new LocalStateRef<Account>(m_accounts[1])
+					), m_rand.Next(50));
 			}
 		}
 
