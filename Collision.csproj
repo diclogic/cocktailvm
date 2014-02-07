@@ -50,7 +50,7 @@
     <Compile Include="Cocktail\Interpretor.cs" />
     <Compile Include="Cocktail\SpaceTime.cs" />
     <Compile Include="Cocktail\State.cs" />
-    <Compile Include="DOA\RemoteRef.cs" />
+    <Compile Include="DOA\DoaNamingSvcClient.cs" />
     <Compile Include="Newton.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

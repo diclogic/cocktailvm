@@ -20,4 +20,20 @@ namespace CollisionTest
             toAcc.Balance += amount;
         }
     }
+
+	public static class AccountingWrapper
+	{
+		public static void Initiate(StateRef account, float amount)
+		{
+			account.SetField("Balance", amount);
+		}
+
+        public static void Transfer(StateRef fromAcc, StateRef toAcc, float amount)
+        {
+			var fFrom = fromAcc.GetField<float>("Balance");
+			fromAcc.SetField("Balance", fFrom - amount);
+			var fTo = toAcc.GetField<float>("Balance");
+			toAcc.SetField("Balance", fTo + amount);
+        }
+	}
 }

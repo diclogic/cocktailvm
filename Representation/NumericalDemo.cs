@@ -10,6 +10,7 @@ using OpenTK.Graphics.OpenGL;
 using MathLib;
 using Cocktail;
 using HTS;
+using DOA;
 
 namespace Representation
 {
@@ -24,6 +25,7 @@ namespace Representation
 		SpaceTime m_initialST;
 		SpaceTime m_secondST;
 		IHierarchicalIdFactory m_idFactory = HierarchicalIdService.GetFactory();
+		NamingSvcClient m_namingSvc = NamingSvcClient.Instance;
 
 		// trival
 		double m_elapsed;
@@ -35,9 +37,11 @@ namespace Representation
 
 			m_initialST = new SpaceTime(m_idFactory.CreateFromRoot(), ITCEvent.CreateZero(), m_idFactory);
 			var newAccount = m_initialST.CreateState((st, stamp) => new Account(st, stamp));
+			m_namingSvc.RegisterObject(newAccount.StateId.ToString(), newAccount.GetType().ToString(), newAccount);
 			m_accounts.Add(newAccount as Account);
 			m_secondST = new SpaceTime(m_idFactory.CreateFromRoot(), ITCEvent.CreateZero(), m_idFactory);
 			newAccount = m_secondST.CreateState((st, stamp) => new Account(st, stamp));
+			m_namingSvc.RegisterObject(newAccount.StateId.ToString(), newAccount.GetType().ToString(), newAccount);
 			m_accounts.Add(newAccount as Account);
 
 
@@ -57,7 +61,7 @@ namespace Representation
 
 			foreach (var acc in m_accounts)
 			{
-				kernel.Call("Initiate", m_initialST, Utils.MakeArgList("account", new LocalStateRef<Account>(acc)), 900);
+				kernel.Call("Initiate", m_initialST, Utils.MakeArgList("account", new RemoteStateRef(acc.StateId,acc.GetType().ToString())), 900);
 			}
 		}
 
@@ -67,7 +71,7 @@ namespace Representation
 			{
 				kernel.Call("Transfer", m_initialST, Utils.MakeArgList(
 					"fromAcc", new LocalStateRef<Account>(m_accounts[0])
-					, "toAcc", new LocalStateRef<Account>(m_accounts[1])
+					, "toAcc", new RemoteStateRef(m_accounts[1].StateId, m_accounts[1].GetType().ToString())
 					), m_rand.Next(50));
 			}
 		}

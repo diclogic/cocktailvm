@@ -8,6 +8,7 @@ using System.Reflection;
 using itcsharp;
 using HTS;
 using Common;
+using DOA;
 
 
 namespace Cocktail
@@ -42,7 +43,7 @@ namespace Cocktail
 	public class StateParam : IEquatable<StateParam>, IEqualityComparer<StateParam>
 	{
 		public string name;
-		public Type type;
+		public string type;
 		public int index;
 
 		public bool Equals(StateParam rhs)
@@ -67,15 +68,23 @@ namespace Cocktail
 
 	public abstract class StateRef
 	{
-		private Type m_refType;
+		protected string m_refType;
 		public TStateId StateId { get; private set; }
+
 		protected StateRef(TStateId stateId, Type refType)
+			:this(stateId, refType.ToString())
+		{
+		}
+		protected StateRef(TStateId stateId, string refType)
 		{
 			StateId = stateId;
 			m_refType = refType;
 		}
-		public Type GetRefType() { return m_refType; }
+		public string GetRefType() { return m_refType; }
 		//public virtual object GetInterface() { return null; }
+
+		public virtual T GetField<T>(string name) { throw new NotImplementedException(); }
+		public virtual void SetField<T>(string name, T val) { throw new NotImplementedException(); }
 	}
 
 	public abstract class StateRefT<T>: StateRef
@@ -84,7 +93,6 @@ namespace Cocktail
 		protected StateRefT(TStateId stateId)
 			: base(stateId, typeof(T))
 		{
-
 		}
 
 		//public virtual T GetInterface() { return null; }
@@ -105,11 +113,38 @@ namespace Cocktail
 		{
 			return (T)m_impl;
 		}
+
+		public override TField GetField<TField>(string name)
+		{
+			return (TField)m_impl.GetType().GetField(name).GetValue(m_impl);
+		}
+
+		public override void SetField<TField>(string name, TField val)
+		{
+			m_impl.GetType().GetField(name).SetValue(m_impl, val);
+		}
 	}
 
-	public class RemoteStateRef<T> : StateRefT<T>
+	public class RemoteStateRef : StateRef
 	{
+		public RemoteStateRef(TStateId stateId, string refType)
+			: base(stateId, refType)
+		{
+		}
 
+		public override T GetField<T>(string name)
+		{
+			var state = NamingSvcClient.Instance.QueryObjectLocation(StateId.ToString(), m_refType);
+			var type = state.GetType();
+			return (T)type.GetField(name).GetValue(state);
+		}
+
+		public override void SetField<T>(string name, T val)
+		{
+			var state = NamingSvcClient.Instance.QueryObjectLocation(StateId.ToString(), m_refType);
+			var type = state.GetType();
+			type.GetField(name).SetValue(state, val);
+		}
 	}
 
 	public class StateParamInst : StateParam
@@ -265,7 +300,7 @@ namespace Cocktail
 			{
 				if (p.GetCustomAttributes(typeof(StateAttribute), false).FirstOrDefault() != null)
 				{
-					states.Add(new StateParam() { name = p.Name, type = p.ParameterType, index = p.Position });
+					states.Add(new StateParam() { name = p.Name, type = p.ParameterType.ToString(), index = p.Position });
 				}
 				else
 				{
@@ -279,11 +314,10 @@ namespace Cocktail
         public static FunctionForm From(IEnumerable<KeyValuePair<string, State>> states, IEnumerable<Type> paramTypes)
         {
             return new FunctionForm(
-                states.Select<KeyValuePair<string, State>, StateParam>((kv) => new StateParam() { name = kv.Key, type = kv.Value.GetType() })
+                states.Select<KeyValuePair<string, State>, StateParam>((kv) => new StateParam() { name = kv.Key, type = kv.Value.GetType().ToString() })
                 , paramTypes);
         }
 
-	
         public int CompareTo(FunctionForm rhs)
         {
             return m_signature.CompareTo(rhs.m_signature);
@@ -462,9 +496,16 @@ namespace Cocktail
             }
         }
 
+		public void DeclareAndLink(string name, MethodInfo methodInfo, Function body)
+		{
+			var form = FunctionForm.From(methodInfo);
+			Declare(name, form);
+			Link(name, form, body);
+		}
+
 		public void Call(string eventName, SpaceTime mainST, IEnumerable<KeyValuePair<string, StateRef>> states, params object[] constArgs)
 		{
-            var sign = Match(eventName
+            var sign = Find(eventName
                 , GenStateParams(states)
                 , constArgs.Select<object,Type>((o)=>o.GetType()) );
 
@@ -478,7 +519,7 @@ namespace Cocktail
 
 		// Internal
 
-        FunctionSignature Match(string name, IEnumerable<StateParam> stateParams, IEnumerable<Type> constParams )
+        FunctionSignature Find(string name, IEnumerable<StateParam> stateParams, IEnumerable<Type> constParams )
         {
             List<FunctionSignature> funcGroup;
             if (!m_declGroups.TryGetValue(name, out funcGroup))
