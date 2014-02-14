@@ -18,12 +18,12 @@ namespace Representation
 	{
 		delegate void TransferDeleg(Account fromAcc, Account toAcc);
 		List<Account> m_accounts = new List<Account>();
-		Interpretor kernel = Interpretor.Instance;
 		AABB m_worldBox;
 		double m_accumulate = 0;
 		Random m_rand = new Random();
 		SpaceTime m_initialST;
 		SpaceTime m_secondST;
+		List<SpaceTime> m_spacetimes = new List<SpaceTime>();
 		IHierarchicalIdFactory m_idFactory = HierarchicalIdService.GetFactory();
 		NamingSvcClient m_namingSvc = NamingSvcClient.Instance;
 
@@ -36,19 +36,25 @@ namespace Representation
 			m_worldBox = worldBox;
 
 			m_initialST = new SpaceTime(m_idFactory.CreateFromRoot(), ITCEvent.CreateZero(), m_idFactory);
+			m_secondST = new SpaceTime(m_idFactory.CreateFromRoot(), ITCEvent.CreateZero(), m_idFactory);
+			m_spacetimes.Add(m_initialST);
+			m_spacetimes.Add(m_secondST);
+
 			var newAccount = m_initialST.CreateState((st, stamp) => new Account(st, stamp));
 			m_namingSvc.RegisterObject(newAccount.StateId.ToString(), newAccount.GetType().ToString(), newAccount);
 			m_accounts.Add(newAccount as Account);
-			m_secondST = new SpaceTime(m_idFactory.CreateFromRoot(), ITCEvent.CreateZero(), m_idFactory);
+
 			newAccount = m_secondST.CreateState((st, stamp) => new Account(st, stamp));
 			m_namingSvc.RegisterObject(newAccount.StateId.ToString(), newAccount.GetType().ToString(), newAccount);
 			m_accounts.Add(newAccount as Account);
 
+			{
+				// declare a function form for an event, which also means binding an event to one or a few state types
+				m_initialST.VMExecute("Cocktail.DeclareAndLink", "Initiate", typeof(Accounting).GetMethod("Initiate"));
+				m_initialST.VMExecute("Cocktail.DeclareAndLink", "Transfer", typeof(Accounting).GetMethod("Transfer"));
+				//kernel.Declare("CreateAccount", FunctionForm.From(typeof(Accounting).GetMethod("CreateAccount")));
+			}
 
-			// declare a function form for an event, which also means binding an event to one or a few state types
-			kernel.Declare("Initiate", FunctionForm.From(typeof(Accounting).GetMethod("Initiate")));
-			kernel.Declare("Transfer", FunctionForm.From(typeof(Accounting).GetMethod("Transfer")));
-			//kernel.Declare("CreateAccount", FunctionForm.From(typeof(Accounting).GetMethod("CreateAccount")));
 
 			//foreach (var p in m_particles)
 			//{
@@ -61,7 +67,7 @@ namespace Representation
 
 			foreach (var acc in m_accounts)
 			{
-				kernel.Call("Initiate", m_initialST, Utils.MakeArgList("account", new RemoteStateRef(acc.StateId,acc.GetType().ToString())), 900);
+				m_initialST.Execute("Initiate", Utils.MakeArgList("account", new RemoteStateRef(acc.StateId,acc.GetType().ToString())), (float)900);
 			}
 		}
 
@@ -69,10 +75,10 @@ namespace Representation
 		{
 			if (m_elapsed > 2 && m_pushFlag)
 			{
-				kernel.Call("Transfer", m_initialST, Utils.MakeArgList(
-					"fromAcc", new LocalStateRef<Account>(m_accounts[0])
-					, "toAcc", new RemoteStateRef(m_accounts[1].StateId, m_accounts[1].GetType().ToString())
-					), m_rand.Next(50));
+				m_initialST.Execute("Transfer"
+					, Utils.MakeArgList( "fromAcc", new LocalStateRef<Account>(m_accounts[0])
+						, "toAcc", new RemoteStateRef(m_accounts[1].StateId, m_accounts[1].GetType().ToString()))
+					, (float)m_rand.Next(50));
 			}
 		}
 

@@ -19,6 +19,21 @@ namespace Cocktail
 
 	}
 
+	/// <summary>
+	/// VM is a special state. It has version. It can only be changed/updated only by deployment system
+	/// </summary>
+	public class VMState : State
+	{
+		public Interpretor Interpretor { get; private set; }
+
+		public VMState(SpaceTime st, IHierarchicalTimestamp stamp)
+			:base(st,stamp)
+		{
+			Interpretor = new Interpretor();
+			Interpretor.DeclareAndLink("Cocktail.DeclareAndLink", typeof(Interpretor).GetMethod("DeclareAndLink_cocktail"));
+		}
+	}
+
     /// <summary>
     /// the SpaceTime represents the development of objects
     /// it is a thread apartment that can include one to many objects
@@ -35,6 +50,7 @@ namespace Cocktail
 		private object m_executionLock = new object();
 		private SortedList<IHierarchicalEvent, ExecutionFraction> m_incomingExecutions;
 		private IHierarchicalEvent m_executingEvent;
+		private VMState m_vm;
 
 		// we use cached state to "pro-act" on an event involves external states optimistically, and let the external ST denies it.
 		private Dictionary<IHierarchicalId, HashSet<State>> m_cachedExternalStates;
@@ -59,6 +75,7 @@ namespace Cocktail
 			m_currentTime = stamp;
 			m_idFactory = idFactory;
 			m_states = initialStates.ToDictionary((s) => s.StateId);
+			m_vm = (VMState)CreateState((st,_stamp) => new VMState(st,_stamp));
 		}
 
 		public State CreateState(Func<SpaceTime, IHierarchicalTimestamp, State> constructor)
@@ -150,15 +167,20 @@ namespace Cocktail
 			}
 		}
 
-		public void Execute(Function func, IEnumerable<StateParamInst> stateParams, IEnumerable<object> constArgs)
+		public void Execute(string funcName, IEnumerable<KeyValuePair<string, StateRef>> stateParams, params object[] constArgs)
+		{
+			ExecuteArgs(funcName, stateParams, constArgs);
+		}
+		public void ExecuteArgs(string funcName, IEnumerable<KeyValuePair<string,StateRef>> stateParams, IEnumerable<object> constArgs)
 		{
 			IEnumerable<TStateId> excluded;
 			// internal event
-			if (ContainAll(stateParams.Select((stparam) => stparam.arg.StateId), out excluded))
+			if (ContainAll(stateParams.Select((sp) => sp.Value.StateId), out excluded))
 			{
 				IHierarchicalEvent evt;
 				while ((evt = BeginAdvance()) == null) ;
-				func.Exec(stateParams, constArgs);
+
+				m_vm.Interpretor.Call(funcName, this, stateParams, constArgs.ToArray());
 				CommitAdvance(evt);
 			}
 			else
@@ -170,6 +192,17 @@ namespace Cocktail
 				// Fetch it from somewhere
 
 			}
+		}
+
+		public void VMExecute(string funcName, params object[] constArgs)
+		{
+			VMExecuteArgs(funcName, constArgs);
+		}
+		public void VMExecuteArgs(string funcName, IEnumerable<object> constArgs)
+		{
+			ExecuteArgs(funcName
+				, Enumerable.Repeat(new KeyValuePair<string, StateRef>("VM", new LocalStateRef<VMState>(m_vm)), 1)
+				, constArgs);
 		}
 
 		private bool ContainAll(IEnumerable<TStateId> stateIds, out IEnumerable<TStateId> excluded)
@@ -201,6 +234,10 @@ namespace Cocktail
         {
             if (m_currentTime.Event.LtEq(event_))
             {
+				var oldVal = Interlocked.CompareExchange(ref m_executingEvent, null, event_);
+				if (oldVal != event_)
+					throw new ApplicationException("Race condition on m_executingEvent");
+
                 m_currentTime = new ITCTimestamp(m_currentTime.ID as ITCIdentity, event_ as ITCEvent);
                 return true;
             }

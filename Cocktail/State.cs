@@ -39,6 +39,11 @@ namespace Cocktail
 		{
 			return m_val == 0;
 		}
+
+		public override string ToString()
+		{
+			return m_val.ToString();
+		}
 	}
 
 	public class State //: ICloneable

@@ -9,6 +9,7 @@ using itcsharp;
 using HTS;
 using Common;
 using DOA;
+using System.IO;
 
 
 namespace Cocktail
@@ -40,7 +41,7 @@ namespace Cocktail
 		}
 	}
 
-	public class StateParam : IEquatable<StateParam>, IEqualityComparer<StateParam>
+	public class StateParam : IEquatable<StateParam>
 	{
 		public string name;
 		public string type;
@@ -48,22 +49,35 @@ namespace Cocktail
 
 		public bool Equals(StateParam rhs)
 		{
-			return name == rhs.name && type.Equals(rhs.type);
+			return name == rhs.name && type == rhs.type;
 		}
 
-		#region IEqualityComparer<StateParam> Members
+	}
 
+	public class StateParamComparer : IEqualityComparer<StateParam>
+	{
 		public bool Equals(StateParam x, StateParam y)
 		{
-			return x.name == y.name && x.type.Equals(y.type);
+			return x.name == y.name && x.type == y.type;
 		}
-
 		public int GetHashCode(StateParam obj)
 		{
-			throw new NotImplementedException();
+			return obj.name.GetHashCode() ^ obj.type.GetHashCode();
+		}
+	}
+
+	public class ConstParamComparer : IEqualityComparer<Type>
+	{
+		public bool Equals(Type x, Type y)
+		{
+			return x.IsAssignableFrom(y);
 		}
 
-		#endregion
+		public int GetHashCode(Type obj)
+		{
+			return obj.GetHashCode();
+		}
+
 	}
 
 	public abstract class StateRef
@@ -161,19 +175,31 @@ namespace Cocktail
     /// </summary>
 	public class Function
 	{
-		Delegate m_fn;
-		FunctionForm m_form;
+		Func<object[],object> m_fn;
+		public FunctionForm Form { get; private set; }
 		public Function(FunctionForm form, Delegate fn)
 		{
-			m_fn = fn;
-			m_form = form;
+			m_fn = (args) => fn.DynamicInvoke(args);
+			Form = form;
 		}
+		public Function(MethodInfo methodInfo)
+		{
+			Form = FunctionForm.From(methodInfo);
+			m_fn = (args) => methodInfo.Invoke(null, args);
+		}
+		
 		public void Exec(IEnumerable<StateParamInst> states, IEnumerable<object> constArgs)
 		{
-			if (!m_form.Check(states, constArgs))
+			if (!Form.Check(states, constArgs))
 				throw new ApplicationException("The invocation doesn't match the form of the event declaration");
-			var argList = m_form.GenArgList(states, constArgs).ToArray();
-			m_fn.DynamicInvoke(argList);
+			var argList = Form.GenArgList(states, constArgs).ToArray();
+			Exec(argList);
+		}
+
+		private void Exec(object[] argList)
+		{
+			// return value ignored for now
+			m_fn(argList);
 		}
 
 		//public static Function Make<P1>(Action<IEnumerable<StateParam>,P1> fn)
@@ -183,7 +209,7 @@ namespace Cocktail
 		//}
 	}
 
-	public sealed class FunctionForm : IComparable<FunctionForm>
+	public sealed class FunctionForm : IComparable<FunctionForm>, IEquatable<FunctionForm>
 	{
 		readonly Dictionary<string, StateParam> m_stateTypes;
 		readonly List<Type> m_paramTypes;
@@ -240,8 +266,12 @@ namespace Cocktail
 
         public bool Check(IEnumerable<StateParam> states, IEnumerable<Type> constParams)
         {
-            return m_stateTypes.Values.SequenceEqual(states)
-                && m_paramTypes.SequenceEqual(constParams);
+			//var eqsts = from st in m_stateTypes.Values
+			//    from sp in states
+			//        where st == sp
+			//        select st;
+            return m_stateTypes.Values.SequenceEqual(states, new StateParamComparer())
+				&& m_paramTypes.SequenceEqual(constParams, new ConstParamComparer());
         }
 
 		public bool Check(IEnumerable<StateParam> states, IEnumerable<object> constArgs)
@@ -322,7 +352,70 @@ namespace Cocktail
         {
             return m_signature.CompareTo(rhs.m_signature);
         }
+
+		public bool Equals(FunctionForm rhs)
+		{
+			if (this.m_stateTypes.Count != rhs.m_stateTypes.Count
+				|| this.m_paramTypes.Count != rhs.m_paramTypes.Count)
+				return false;
+			foreach (var stateKV in this.m_stateTypes)
+			{
+				StateParam sp;
+				if (!rhs.m_stateTypes.TryGetValue(stateKV.Key, out sp))
+					return false;
+				if (!stateKV.Value.Equals(sp))
+					return false;
+			}
+
+			if (!this.m_paramTypes.SequenceEqual(rhs.m_paramTypes, new ConstParamComparer()))
+				return false;
+
+			return true;
+		}
     }
+
+	public class FunctionSignature : IComparable<FunctionSignature>, IEquatable<FunctionSignature>
+	{
+		public string Name;
+		public FunctionForm Form;
+
+		public FunctionSignature(string name, FunctionForm form)
+		{
+			Name = name;
+			Form = form;
+		}
+
+		public int CompareTo(FunctionSignature rhs)
+		{
+			var retval = this.Name.CompareTo(rhs);
+			if (retval == 0)
+				retval = this.Form.CompareTo(rhs.Form);
+			return retval;
+		}
+
+		public bool Equals(FunctionSignature rhs)
+		{
+			return (this.Name == rhs.Name) && this.Form.Equals(rhs.Form);
+		}
+
+		public static FunctionSignature Generate(string name, IEnumerable<KeyValuePair<string, State>> states, IEnumerable<Type> paramTypes)
+		{
+			return new FunctionSignature(name, FunctionForm.From(states, paramTypes));
+		}
+	}
+
+	public class FunctionSignatureComparer : IEqualityComparer<FunctionSignature>
+	{
+		public bool Equals(FunctionSignature x, FunctionSignature y)
+		{
+			return x.Equals(y);
+		}
+
+		public int GetHashCode(FunctionSignature obj)
+		{
+			return obj.Name.GetHashCode() ^ obj.Form.GetHashCode();
+		}
+	}
 
 
     internal struct SubscriptionSignature : IComparable<SubscriptionSignature>
@@ -434,6 +527,12 @@ namespace Cocktail
         public CompileTimeException(string reason) : base(reason) { }
     }
 
+	public class RuntimeException : ApplicationException
+	{
+        public RuntimeException(string reason) : base(reason) { }
+	}
+
+
     /// <summary>
     /// The prototype of cocktail interpretor backend
     /// </summary>
@@ -441,33 +540,13 @@ namespace Cocktail
 	{
 		public static Interpretor Instance = new Interpretor();
 
-        class FunctionSignature : IComparable<FunctionSignature>
-        {
-            public string Name;
-            public FunctionForm Form;
-
-            public FunctionSignature(string name, FunctionForm form)
-            {
-                Name = name;
-                Form = form;
-            }
-
-            public int CompareTo(FunctionSignature rhs)
-            {
-                var retval = this.Name.CompareTo(rhs);
-                if (retval == 0)
-                    retval = this.Form.CompareTo(rhs.Form);
-                return retval;
-            }
-            public static FunctionSignature Generate(string name, IEnumerable<KeyValuePair<string, State>> states, IEnumerable<Type> paramTypes)
-            {
-                return new FunctionSignature(name, FunctionForm.From(states, paramTypes));
-            }
-        }
-
 		Dictionary<string, List<FunctionSignature>> m_declGroups = new Dictionary<string, List<FunctionSignature>>();
-        Dictionary<FunctionSignature, Function> m_functionBodies = new Dictionary<FunctionSignature, Function>();
+		Dictionary<FunctionSignature, Function> m_functionBodies;
 
+		public Interpretor()
+		{
+			m_functionBodies = new Dictionary<FunctionSignature, Function>(new FunctionSignatureComparer());
+		}
 
         public void Declare(string name, MethodInfo methodInfo)
         {
@@ -484,11 +563,11 @@ namespace Cocktail
             functionGroup.Add(new FunctionSignature(name, form));
 		}
 
-        public void Link(string name, FunctionForm form, Function body)
+        public void Link(string name, Function body)
         {
             try
             {
-                m_functionBodies.Add(new FunctionSignature(name, form), body);
+                m_functionBodies.Add(new FunctionSignature(name, body.Form), body);
             }
             catch (System.ArgumentException)
             {
@@ -496,24 +575,45 @@ namespace Cocktail
             }
         }
 
-		public void DeclareAndLink(string name, MethodInfo methodInfo, Function body)
+		public void DeclareAndLink(string name, MethodInfo methodInfo)
 		{
 			var form = FunctionForm.From(methodInfo);
 			Declare(name, form);
-			Link(name, form, body);
+			Link(name, new Function(methodInfo));
+		}
+
+		public static void DeclareAndLink_cocktail([State] VMState VM, string name, MethodInfo methodInfo)
+		{
+			VM.Interpretor.DeclareAndLink(name, methodInfo);
+		}
+
+		// TODO: implement
+		/// <summary>
+		/// Serialize and deploy a function from remote
+		/// </summary>
+		public void DeclareAndLinkBinary(string name, FunctionForm form, Stream binary)
+		{
+
 		}
 
 		public void Call(string eventName, SpaceTime mainST, IEnumerable<KeyValuePair<string, StateRef>> states, params object[] constArgs)
 		{
-            var sign = Find(eventName
-                , GenStateParams(states)
-                , constArgs.Select<object,Type>((o)=>o.GetType()) );
+			var stateParams = GenStateParams(states);
+			var constTypes = constArgs.Select<object,Type>((o)=>o.GetType());
+            var sign = Find(eventName , stateParams , constTypes );
+
+			if (sign == null)
+				throw new CompileTimeException(string.Format("Function [{0}({1})] was not declared"
+												, eventName
+												, MakeSignatureString(stateParams, constTypes) ));
 
             Function func;
             if (!m_functionBodies.TryGetValue(sign, out func))
-				return;
+				throw new RuntimeException(string.Format("Function [{0}({1})] was not linked to any body"
+											, eventName
+											, MakeSignatureString(stateParams, constTypes) ));
 
-			mainST.Execute(func, GenStateParamInsts(states), constArgs);
+			func.Exec(GenStateParamInsts(states), constArgs);
 		}
 
 
@@ -532,6 +632,16 @@ namespace Cocktail
             }
             return null;
         }
+
+		string MakeSignatureString(IEnumerable<StateParam> stateParams, IEnumerable<Type> constParams)
+		{
+			var sb = new StringBuilder();
+			foreach (var sp in stateParams.ToList())
+				sb.AppendFormat("{0} {1},", sp.type, sp.name);
+			foreach (var cp in constParams)
+				sb.AppendFormat("const {0},", cp.Name);
+			return sb.ToString(0, Math.Max(0, sb.Length - 1));
+		}
 
 
 		IEnumerable<StateParamInst> GenStateParamInsts(IEnumerable<KeyValuePair<string, StateRef>> states)
