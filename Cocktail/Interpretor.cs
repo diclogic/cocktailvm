@@ -10,6 +10,7 @@ using HTS;
 using Common;
 using DOA;
 using System.IO;
+using System.Reflection.Emit;
 
 
 namespace Cocktail
@@ -185,6 +186,7 @@ namespace Cocktail
 		public Function(MethodInfo methodInfo)
 		{
 			Form = FunctionForm.From(methodInfo);
+			// TODO: need Cocktail to C# invocation adapter
 			m_fn = (args) => methodInfo.Invoke(null, args);
 		}
 		
@@ -232,16 +234,16 @@ namespace Cocktail
 
 		public IEnumerable<object> GenArgList(IEnumerable<StateParamInst> states, IEnumerable<object> constArgs)
 		{
-			states = states.Select<StateParamInst, StateParamInst>((spi) =>
+			IEnumerable<KeyValuePair<object,int>> stateArgs = states.Select<StateParamInst, StateParamInst>((spi) =>
 				{
 					StateParam sp;
 					if (!m_stateTypes.TryGetValue(spi.name, out sp))
 						throw new ApplicationException(string.Format("can't find state param '{0}'", spi.name));
 					var newspi = new StateParamInst() { name = sp.name, type = sp.type, index = sp.index, arg = spi.arg };
 					return newspi;
-				});
+				}).Select(ConvertCocktailToCSharp);
 			bool bStateRemain, bConstRemain;
-			var stateEnumerator = states.GetEnumerator();
+			var stateEnumerator = stateArgs.GetEnumerator();
 			var constEnumerator = constArgs.GetEnumerator();
 			bStateRemain = stateEnumerator.MoveNext();
 			bConstRemain = constEnumerator.MoveNext();
@@ -249,9 +251,9 @@ namespace Cocktail
 			int idx = 0;
 			do
 			{
-				if (bStateRemain && idx == stateEnumerator.Current.index)
+				if (bStateRemain && idx == stateEnumerator.Current.Value)
 				{
-					yield return stateEnumerator.Current.arg;
+					yield return stateEnumerator.Current.Key;
 					bStateRemain = stateEnumerator.MoveNext();
 				}
 				else if (bConstRemain)
@@ -262,6 +264,26 @@ namespace Cocktail
 				++idx;
 			}
 			while (bStateRemain || bConstRemain);
+		}
+
+		private static KeyValuePair<object, int> ConvertCocktailToCSharp(StateParamInst spi)
+		{
+			// no need to convert if already warpped
+			if (spi.type == "Cocktail.StateRef")
+				return new KeyValuePair<object, int>(spi.arg, spi.index);
+
+			var stateType = spi.arg.GetType();
+			if (stateType.IsGenericType && stateType.GetGenericTypeDefinition() == typeof(LocalStateRef<>))
+			{
+				var ret = stateType.InvokeMember("GetInterface", BindingFlags.InvokeMethod, null, spi.arg, new object[0]);
+				return new KeyValuePair<object, int>(ret, spi.index);
+			}
+			else if (stateType == typeof(RemoteStateRef))
+			{
+				throw new NotImplementedException();
+			}
+
+			throw new ArgumentOutOfRangeException("Unknown StateRef");
 		}
 
         public bool Check(IEnumerable<StateParam> states, IEnumerable<Type> constParams)
@@ -371,6 +393,16 @@ namespace Cocktail
 				return false;
 
 			return true;
+		}
+
+		public override int GetHashCode()
+		{
+			int retval = 0;
+			foreach (var pt in m_paramTypes)
+				retval ^= pt.FullName.GetHashCode();
+			foreach (var st in m_stateTypes)
+				retval ^= st.Value.type.GetHashCode();
+			return retval;
 		}
     }
 

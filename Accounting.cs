@@ -23,12 +23,12 @@ namespace CollisionTest
 
 	public static class AccountingWrapper
 	{
-		public static void Initiate(StateRef account, float amount)
+		public static void Initiate([State] StateRef account, float amount)
 		{
 			account.SetField("Balance", amount);
 		}
 
-        public static void Transfer(StateRef fromAcc, StateRef toAcc, float amount)
+        public static void Transfer([State] StateRef fromAcc,[State] StateRef toAcc, float amount)
         {
 			var fFrom = fromAcc.GetField<float>("Balance");
 			fromAcc.SetField("Balance", fFrom - amount);

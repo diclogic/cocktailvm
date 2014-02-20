@@ -50,8 +50,8 @@ namespace Representation
 
 			{
 				// declare a function form for an event, which also means binding an event to one or a few state types
-				m_initialST.VMExecute("Cocktail.DeclareAndLink", "Initiate", typeof(Accounting).GetMethod("Initiate"));
-				m_initialST.VMExecute("Cocktail.DeclareAndLink", "Transfer", typeof(Accounting).GetMethod("Transfer"));
+				m_initialST.VMExecute("Cocktail.DeclareAndLink", "Initiate", typeof(AccountingWrapper).GetMethod("Initiate"));
+				m_initialST.VMExecute("Cocktail.DeclareAndLink", "Transfer", typeof(AccountingWrapper).GetMethod("Transfer"));
 				//kernel.Declare("CreateAccount", FunctionForm.From(typeof(Accounting).GetMethod("CreateAccount")));
 			}
 
