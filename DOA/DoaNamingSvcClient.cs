@@ -5,6 +5,7 @@ using System.Text;
 using Cocktail;
 using System.Net;
 using System.Net.Sockets;
+using HTS;
 
 //////////////////////////////////////////////////////////////////////////
 /// Fake DOA implementation
@@ -17,7 +18,7 @@ namespace DOA
 		protected struct Entry
 		{
 			public string type;
-			public object ptr;
+			public State ptr;	// FIXME: fake impl
 		}
 
 		public struct Location
@@ -30,13 +31,13 @@ namespace DOA
 
 		private Dictionary<string, Entry> m_objects = new Dictionary<string, Entry>();
 
-		public bool RegisterObject(string objName, string objType, object ptr)
+		public bool RegisterObject(string objName, string objType, State ptr)
 		{
 			m_objects.Add(objName, new Entry() { type = objType, ptr = ptr });
 			return true;
 		}
 
-		public object QueryObjectLocation(string objName, string objType)
+		public object GetObject(string objName, string objType)
 		{
 			Entry retval;
 			m_objects.TryGetValue(objName, out retval);
@@ -44,6 +45,16 @@ namespace DOA
 			if (retval.type != objType)
 				return null;
 			return retval.ptr;
+		}
+		public IHierarchicalId GetObjectSpaceTimeID(string objName)
+		{
+			Entry retval;
+			if (m_objects.TryGetValue(objName, out retval))
+			{
+				return retval.ptr.LatestUpdate.ID;
+			}
+
+			return null;
 		}
 	}
 }

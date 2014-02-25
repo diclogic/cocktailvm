@@ -21,6 +21,7 @@ namespace CollisionTest
         }
     }
 
+	// TODO: CLEAN UP: we don't need wrapper anymore, a state should be sync'd as a whole to allow Repeatable-Read
 	public static class AccountingWrapper
 	{
 		public static void Initiate([State] StateRef account, float amount)

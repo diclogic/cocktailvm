@@ -5,6 +5,8 @@ using System.Text;
 using System.Threading;
 using HTS;
 using System.IO;
+using DOA;
+using System.Runtime.Serialization;
 
 namespace Cocktail
 {
@@ -19,6 +21,12 @@ namespace Cocktail
 
 	}
 
+	public struct ExternalSTEntry
+	{
+		IHierarchicalTimestamp LatestUpateTime;
+		HashSet<State> States;
+	}
+
 	/// <summary>
 	/// VM is a special state. It has version. It can only be changed/updated only by deployment system
 	/// </summary>
@@ -26,7 +34,7 @@ namespace Cocktail
 	{
 		public Interpreter Interpreter { get; private set; }
 
-		public VMState(SpaceTime st, IHierarchicalTimestamp stamp)
+		public VMState(Spacetime st, IHierarchicalTimestamp stamp)
 			:base(st,stamp)
 		{
 			Interpreter = new Interpreter();
@@ -41,7 +49,7 @@ namespace Cocktail
     /// 2) 2 SpaceTimes can merge into 1
     /// 3) SpaceTime cannot cross machine boundary (we need something else to do distributed transaction)
     /// </summary>
-	public class SpaceTime
+	public class Spacetime //: ISerializable
 	{
         private IHierarchicalIdFactory m_idFactory;
         private IHierarchicalTimestamp m_currentTime;
@@ -53,24 +61,24 @@ namespace Cocktail
 		private VMState m_vm;
 
 		// we use cached state to "pro-act" on an event involves external states optimistically, and let the external ST denies it.
-		private Dictionary<IHierarchicalId, HashSet<State>> m_cachedExternalStates;
+		private Dictionary<IHierarchicalId, ExternalSTEntry> m_cachedExternalST;
 
-        public SpaceTime(IHierarchicalTimestamp stamp, IHierarchicalIdFactory idFactory)
+        public Spacetime(IHierarchicalTimestamp stamp, IHierarchicalIdFactory idFactory)
 			:this(stamp, idFactory, Enumerable.Empty<State>())
         {
         }
 
-		public SpaceTime(IHierarchicalId id, IHierarchicalEvent event_, IHierarchicalIdFactory idFactory)
+		public Spacetime(IHierarchicalId id, IHierarchicalEvent event_, IHierarchicalIdFactory idFactory)
 			:this(HierarchicalTimestampFactory.Make(id, event_), idFactory, Enumerable.Empty<State>())
 		{
 		}
 
-		public SpaceTime(IHierarchicalId id, IHierarchicalEvent event_, IHierarchicalIdFactory idFactory, IEnumerable<State> initialStates)
+		public Spacetime(IHierarchicalId id, IHierarchicalEvent event_, IHierarchicalIdFactory idFactory, IEnumerable<State> initialStates)
 			:this(HierarchicalTimestampFactory.Make(id, event_), idFactory, initialStates)
 		{
 		}
 
-		public SpaceTime(IHierarchicalTimestamp stamp, IHierarchicalIdFactory idFactory, IEnumerable<State> initialStates)
+		public Spacetime(IHierarchicalTimestamp stamp, IHierarchicalIdFactory idFactory, IEnumerable<State> initialStates)
 		{
 			m_currentTime = stamp;
 			m_idFactory = idFactory;
@@ -78,7 +86,7 @@ namespace Cocktail
 			m_vm = (VMState)CreateState((st,_stamp) => new VMState(st,_stamp));
 		}
 
-		public State CreateState(Func<SpaceTime, IHierarchicalTimestamp, State> constructor)
+		public State CreateState(Func<Spacetime, IHierarchicalTimestamp, State> constructor)
         {
             var event_ = BeginAdvance();
             var newState = constructor(this, m_currentTime);
@@ -86,6 +94,14 @@ namespace Cocktail
             CommitAdvance(event_);
             return newState;
         }
+
+		public Stream Serialize()
+		{
+			Stream retval = new MemoryStream();
+			var writer = new BinaryWriter(retval, Encoding.UTF8);
+			writer.Write(this.)
+			
+		}
 
 		///// <summary>
 		///// Create another ST in parallel to this one.
@@ -108,11 +124,11 @@ namespace Cocktail
 		/// <summary>
 		/// Split the spacetime into many pieces so that each state has it's own spacetime
 		/// </summary>
-		public IEnumerable<SpaceTime> SplitForEach()
+		public IEnumerable<Spacetime> SplitForEach()
 		{
 			int count = m_states.Count;
 			if (count <= 1)
-				return new SpaceTime[] { this };
+				return new Spacetime[] { this };
 			var ids = m_idFactory.CreateChildren(m_id, count);
 			var event_ = Advance();
 
@@ -121,11 +137,11 @@ namespace Cocktail
 			return ids.Select((id) =>
 				{
 					iter.MoveNext();
-					return new SpaceTime(id, event_, m_idFactory, new State[] { iter.Current });
+					return new Spacetime(id, event_, m_idFactory, new State[] { iter.Current });
 				});
 		}
 
-		public static SpaceTime Merge(IEnumerable<SpaceTime> spaces)
+		public static Spacetime Merge(IEnumerable<Spacetime> spaces)
 		{
 			throw new NotImplementedException();
 		}
@@ -171,6 +187,7 @@ namespace Cocktail
 		{
 			ExecuteArgs(funcName, stateParams, constArgs);
 		}
+
 		public void ExecuteArgs(string funcName, IEnumerable<KeyValuePair<string,StateRef>> stateParams, IEnumerable<object> constArgs)
 		{
 			IEnumerable<TStateId> excluded;
@@ -183,7 +200,12 @@ namespace Cocktail
 				m_vm.Interpreter.Call(funcName, stateParams, constArgs.ToArray());
 				CommitAdvance(evt);
 			}
-			else
+
+			foreach (var sp in stateParams.Where(kv=> excluded.Contains(kv.Value.StateId)))
+			{
+				var hid = NamingSvcClient.Instance.GetObjectSpaceTimeID(sp.Value.StateId.ToString());
+				
+			}
 			{
 				//TODO:
 
@@ -244,5 +266,14 @@ namespace Cocktail
 
             return false;
         }
-    }
+
+		#region ISerializable Members
+
+		public void GetObjectData(SerializationInfo info, StreamingContext context)
+		{
+			throw new NotImplementedException();
+		}
+
+		#endregion
+	}
 }

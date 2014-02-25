@@ -21,9 +21,9 @@ namespace Representation
 		AABB m_worldBox;
 		double m_accumulate = 0;
 		Random m_rand = new Random();
-		SpaceTime m_initialST;
-		SpaceTime m_secondST;
-		List<SpaceTime> m_spacetimes = new List<SpaceTime>();
+		Spacetime m_initialST;
+		Spacetime m_secondST;
+		List<Spacetime> m_spacetimes = new List<Spacetime>();
 		IHierarchicalIdFactory m_idFactory = HierarchicalIdService.GetFactory();
 		NamingSvcClient m_namingSvc = NamingSvcClient.Instance;
 
@@ -35,8 +35,8 @@ namespace Representation
 		{
 			m_worldBox = worldBox;
 
-			m_initialST = new SpaceTime(m_idFactory.CreateFromRoot(), ITCEvent.CreateZero(), m_idFactory);
-			m_secondST = new SpaceTime(m_idFactory.CreateFromRoot(), ITCEvent.CreateZero(), m_idFactory);
+			m_initialST = new Spacetime(m_idFactory.CreateFromRoot(), ITCEvent.CreateZero(), m_idFactory);
+			m_secondST = new Spacetime(m_idFactory.CreateFromRoot(), ITCEvent.CreateZero(), m_idFactory);
 			m_spacetimes.Add(m_initialST);
 			m_spacetimes.Add(m_secondST);
 
@@ -50,8 +50,8 @@ namespace Representation
 
 			{
 				// declare a function form for an event, which also means binding an event to one or a few state types
-				m_initialST.VMExecute("Cocktail.DeclareAndLink", "Initiate", typeof(AccountingWrapper).GetMethod("Initiate"));
-				m_initialST.VMExecute("Cocktail.DeclareAndLink", "Transfer", typeof(AccountingWrapper).GetMethod("Transfer"));
+				m_initialST.VMExecute("Cocktail.DeclareAndLink", "Initiate", typeof(Accounting).GetMethod("Initiate"));
+				m_initialST.VMExecute("Cocktail.DeclareAndLink", "Transfer", typeof(Accounting).GetMethod("Transfer"));
 				//kernel.Declare("CreateAccount", FunctionForm.From(typeof(Accounting).GetMethod("CreateAccount")));
 			}
 

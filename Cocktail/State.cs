@@ -50,12 +50,12 @@ namespace Cocktail
 	{
 		static Random m_seed = new Random();
 
-		private SpaceTime m_spaceTime;					//< the space-time it belongs to
+		private Spacetime m_spaceTime;					//< the space-time it belongs to
 		public TStateId StateId { get; protected set; }	//< to identify a state
 		public IHierarchicalTimestamp LatestUpdate;
 
 
-		public State(SpaceTime spaceTime, IHierarchicalTimestamp stamp)
+		public State(Spacetime spaceTime, IHierarchicalTimestamp stamp)
 		{
 			StateId = new TStateId(m_seed);
 			m_spaceTime = spaceTime;

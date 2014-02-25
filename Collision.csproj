@@ -47,14 +47,19 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Accounting.cs" />
+    <Compile Include="Cocktail\Function.cs" />
     <Compile Include="Cocktail\Interpretor.cs" />
+    <Compile Include="Cocktail\Parameter.cs" />
     <Compile Include="Cocktail\SpaceTime.cs" />
     <Compile Include="Cocktail\State.cs" />
+    <Compile Include="Cocktail\StateRef.cs" />
     <Compile Include="DOA\DoaNamingSvcClient.cs" />
+    <Compile Include="DOA\SyncManager.cs" />
     <Compile Include="Newton.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="States\Account.cs" />
+    <Compile Include="States\Particle.cs" />
     <Compile Include="Timestamp\IEvent.cs" />
     <Compile Include="Timestamp\IIdentity.cs" />
     <Compile Include="Timestamp\ITimestamp.cs" />

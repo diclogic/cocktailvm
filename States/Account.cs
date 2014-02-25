@@ -10,7 +10,7 @@ namespace CollisionTest.States
     [State]
     public class Account : State
     {
-        public Account(SpaceTime spaceTime, IHierarchicalTimestamp stamp) : base(spaceTime,stamp) { }
+        public Account(Spacetime spaceTime, IHierarchicalTimestamp stamp) : base(spaceTime,stamp) { }
         public float Balance;
     }
 }
