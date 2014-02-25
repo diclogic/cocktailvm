@@ -24,13 +24,13 @@ namespace Cocktail
 	/// </summary>
 	public class VMState : State
 	{
-		public Interpretor Interpretor { get; private set; }
+		public Interpreter Interpreter { get; private set; }
 
 		public VMState(SpaceTime st, IHierarchicalTimestamp stamp)
 			:base(st,stamp)
 		{
-			Interpretor = new Interpretor();
-			Interpretor.DeclareAndLink("Cocktail.DeclareAndLink", typeof(Interpretor).GetMethod("DeclareAndLink_cocktail"));
+			Interpreter = new Interpreter();
+			Interpreter.DeclareAndLink("Cocktail.DeclareAndLink", typeof(Interpreter).GetMethod("DeclareAndLink_cocktail"));
 		}
 	}
 
@@ -180,7 +180,7 @@ namespace Cocktail
 				IHierarchicalEvent evt;
 				while ((evt = BeginAdvance()) == null) ;
 
-				m_vm.Interpretor.Call(funcName, this, stateParams, constArgs.ToArray());
+				m_vm.Interpreter.Call(funcName, stateParams, constArgs.ToArray());
 				CommitAdvance(evt);
 			}
 			else

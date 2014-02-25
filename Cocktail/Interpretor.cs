@@ -500,9 +500,9 @@ namespace Cocktail
     //{
     //    Dictionary<SubscriptionSignature, Function> m_subscriptions = new Dictionary<SubscriptionSignature, Function>();
     //    List<EventInstance> m_pendingEvents = new List<EventInstance>();
-    //    Interpretor m_kernel;
+    //    Interpreter m_kernel;
 
-    //    EventProcessor(Interpretor kernel)
+    //    EventProcessor(Interpreter kernel)
     //    {
     //        m_kernel = kernel;
     //    }
@@ -566,16 +566,16 @@ namespace Cocktail
 
 
     /// <summary>
-    /// The prototype of cocktail interpretor backend
+    /// The prototype of cocktail interpreter backend
     /// </summary>
-	public class Interpretor
+	public class Interpreter
 	{
-		public static Interpretor Instance = new Interpretor();
+		public static Interpreter Instance = new Interpreter();
 
 		Dictionary<string, List<FunctionSignature>> m_declGroups = new Dictionary<string, List<FunctionSignature>>();
 		Dictionary<FunctionSignature, Function> m_functionBodies;
 
-		public Interpretor()
+		public Interpreter()
 		{
 			m_functionBodies = new Dictionary<FunctionSignature, Function>(new FunctionSignatureComparer());
 		}
@@ -616,7 +616,7 @@ namespace Cocktail
 
 		public static void DeclareAndLink_cocktail([State] VMState VM, string name, MethodInfo methodInfo)
 		{
-			VM.Interpretor.DeclareAndLink(name, methodInfo);
+			VM.Interpreter.DeclareAndLink(name, methodInfo);
 		}
 
 		// TODO: implement
@@ -628,7 +628,7 @@ namespace Cocktail
 
 		}
 
-		public void Call(string eventName, SpaceTime mainST, IEnumerable<KeyValuePair<string, StateRef>> states, params object[] constArgs)
+		public void Call(string eventName, IEnumerable<KeyValuePair<string, StateRef>> states, params object[] constArgs)
 		{
 			var stateParams = GenStateParams(states);
 			var constTypes = constArgs.Select<object,Type>((o)=>o.GetType());

@@ -11,7 +11,7 @@ namespace CollisionTest
 
         public static void Case1()
         {
-            //var kernel = Interpretor.Instance;
+            //var kernel = Interpreter.Instance;
 
             //var a = new Particle();
             //kernel.AwareOf("GodPush", typeof(NewtonPhysics).GetMethod("GodPush"), new Action<Particle,Vector3>(NewtonPhysics.GodPush), a);

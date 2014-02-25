@@ -16,7 +16,7 @@ namespace Representation
     {
         delegate void GodPushDeleg(Particle p,Vector3 v);
         List<Particle> m_particles = new List<Particle>();
-        Interpretor kernel = Interpretor.Instance;
+        Interpreter kernel = Interpreter.Instance;
         AABB m_worldBox;
         double m_accumulate = 0;
         Random m_rand = new Random();
