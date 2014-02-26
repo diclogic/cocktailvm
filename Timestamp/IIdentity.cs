@@ -52,6 +52,8 @@ namespace HTS
         readonly ITCIdentity m_causalParent;	//< since we used sibling tree, the tree structure no longer follows the causality exactly,
 												//  so we need to save a reference to the causal parent
 
+		public static ITCIdentity Null = new ITCIdentity(itc.Identity.ZERO);
+
 		private ITCIdentity(itc.Identity impl)
 		{
 			m_impl = impl;

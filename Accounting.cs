@@ -19,6 +19,11 @@ namespace CollisionTest
             fromAcc.Balance -= amount;
             toAcc.Balance += amount;
         }
+
+		public static void Deduct([State] Account account, float amount)
+		{
+			account.Balance -= amount;
+		}
     }
 
 	// TODO: CLEAN UP: we don't need wrapper anymore, a state should be sync'd as a whole to allow Repeatable-Read

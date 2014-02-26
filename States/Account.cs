@@ -12,5 +12,13 @@ namespace CollisionTest.States
     {
         public Account(Spacetime spaceTime, IHierarchicalTimestamp stamp) : base(spaceTime,stamp) { }
         public float Balance;
+
+		public override bool Merge(State rhs)
+		{
+			var rhsAcc = rhs as Account;
+			if (Balance != rhsAcc.Balance)
+				return false;
+			return true;
+		}
     }
 }

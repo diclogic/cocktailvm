@@ -7,6 +7,7 @@ using HTS;
 using System.IO;
 using DOA;
 using System.Runtime.Serialization;
+using System.Runtime.Serialization.Formatters.Binary;
 
 namespace Cocktail
 {
@@ -23,8 +24,8 @@ namespace Cocktail
 
 	public struct ExternalSTEntry
 	{
-		IHierarchicalTimestamp LatestUpateTime;
-		HashSet<State> States;
+		public IHierarchicalTimestamp LatestUpateTime;
+		public Dictionary<TStateId,State> States;
 	}
 
 	/// <summary>
@@ -53,15 +54,15 @@ namespace Cocktail
 	{
         private IHierarchicalIdFactory m_idFactory;
         private IHierarchicalTimestamp m_currentTime;
-		private IHierarchicalId m_id { get { return m_currentTime.ID; } }
 		private Dictionary<TStateId, State> m_states;
 		private object m_executionLock = new object();
 		private SortedList<IHierarchicalEvent, ExecutionFraction> m_incomingExecutions;
 		private IHierarchicalEvent m_executingEvent;
 		private VMState m_vm;
-
 		// we use cached state to "pro-act" on an event involves external states optimistically, and let the external ST denies it.
 		private Dictionary<IHierarchicalId, ExternalSTEntry> m_cachedExternalST;
+
+		public IHierarchicalId ID { get { return m_currentTime.ID; } }
 
         public Spacetime(IHierarchicalTimestamp stamp, IHierarchicalIdFactory idFactory)
 			:this(stamp, idFactory, Enumerable.Empty<State>())
@@ -95,12 +96,30 @@ namespace Cocktail
             return newState;
         }
 
-		public Stream Serialize()
+		public void Serialize(Stream ostream)
 		{
-			Stream retval = new MemoryStream();
-			var writer = new BinaryWriter(retval, Encoding.UTF8);
-			writer.Write(this.)
-			
+			var writer = new BinaryWriter(ostream, Encoding.UTF8);
+			var formatter = new BinaryFormatter();
+
+			lock (m_executionLock)
+			{
+				var curTime = m_currentTime;
+				writer.Write(curTime.ID.ToString());
+				writer.Write(curTime.Event.ToString());
+				writer.Write(m_states.Count);
+				foreach (var state in m_states.Values)
+				{
+					formatter.Serialize(ostream, state);
+				}
+			}
+		}
+
+		public KeyValuePair<IHierarchicalTimestamp,IEnumerable<State>> Snapshot()
+		{
+			lock (m_executionLock)
+			{
+				return new KeyValuePair<IHierarchicalTimestamp, IEnumerable<State>>(m_currentTime, m_states.Values);
+			}
 		}
 
 		///// <summary>
@@ -129,7 +148,7 @@ namespace Cocktail
 			int count = m_states.Count;
 			if (count <= 1)
 				return new Spacetime[] { this };
-			var ids = m_idFactory.CreateChildren(m_id, count);
+			var ids = m_idFactory.CreateChildren(ID, count);
 			var event_ = Advance();
 
 
@@ -188,32 +207,72 @@ namespace Cocktail
 			ExecuteArgs(funcName, stateParams, constArgs);
 		}
 
-		public void ExecuteArgs(string funcName, IEnumerable<KeyValuePair<string,StateRef>> stateParams, IEnumerable<object> constArgs)
+		public bool ExecuteArgs(string funcName, IEnumerable<KeyValuePair<string,StateRef>> stateParams, IEnumerable<object> constArgs)
 		{
+			IHierarchicalEvent evt;
+			// cross ST event
 			IEnumerable<TStateId> excluded;
-			// internal event
-			if (ContainAll(stateParams.Select((sp) => sp.Value.StateId), out excluded))
+			if (!ContainAll(stateParams.Select((sp) => sp.Value.StateId), out excluded))
 			{
-				IHierarchicalEvent evt;
 				while ((evt = BeginAdvance()) == null) ;
 
-				m_vm.Interpreter.Call(funcName, stateParams, constArgs.ToArray());
-				CommitAdvance(evt);
-			}
-
-			foreach (var sp in stateParams.Where(kv=> excluded.Contains(kv.Value.StateId)))
-			{
-				var hid = NamingSvcClient.Instance.GetObjectSpaceTimeID(sp.Value.StateId.ToString());
-				
-			}
-			{
 				//TODO:
 
 				// Use local cache first
 
+				IHierarchicalTimestamp failingST = null;
 				// Fetch it from somewhere
-
+				foreach (var sp in stateParams.Where(kv => excluded.Contains(kv.Value.StateId)))
+				{
+					var hid = NamingSvcClient.Instance.GetObjectSpaceTimeID(sp.Value.StateId.ToString());
+					var st = SyncManager.Instance.GetSpacetime(hid);
+					if (!MergeSpacetime(st.Key, st.Value, ref evt))
+					{
+						failingST = st.Key;
+						break;
+					}
+				}
+				
+				// failed to merge foreign ST
+				if (failingST != null)
+					return false;
 			}
+			else
+			{
+				while ((evt = BeginAdvance()) == null) ;
+			}
+
+
+			m_vm.Interpreter.Call(funcName, stateParams, constArgs.ToArray());
+			CommitAdvance(evt);
+			return true;
+		}
+
+		private bool MergeSpacetime(IHierarchicalTimestamp foreignST, IEnumerable<State> foreignStates, ref IHierarchicalEvent expectingEvent)
+		{
+			ExternalSTEntry entry;
+			if (m_cachedExternalST.TryGetValue(foreignST.ID, out entry))
+			{
+				var newStates = new Dictionary<TStateId, State>();
+				foreach (var fst in foreignStates)
+				{
+					State lst;
+					if (entry.States.TryGetValue(fst.StateId, out lst))
+					{
+						if (!lst.Merge(fst))
+							return false;
+					}
+					newStates.Add(fst.StateId, lst ?? fst);
+				}
+				entry.States = newStates;
+			}
+			else
+			{
+				m_cachedExternalST.Add(foreignST.ID, new ExternalSTEntry() { LatestUpateTime = foreignST, States = foreignStates.ToDictionary(s => s.StateId) });
+			}
+			var localTime = HierarchicalTimestampFactory.Make(ID, expectingEvent);
+			expectingEvent = localTime.Join(foreignST).Event;
+			return true;
 		}
 
 		public void VMExecute(string funcName, params object[] constArgs)
@@ -254,6 +313,7 @@ namespace Cocktail
 
         private bool CommitAdvance(IHierarchicalEvent event_)
         {
+			// If current time is compatible to committing event
             if (m_currentTime.Event.LtEq(event_))
             {
 				var oldVal = Interlocked.CompareExchange(ref m_executingEvent, null, event_);

@@ -1,6 +1,8 @@
 ﻿using System;
 using System.IO;
 using HTS;
+using System.Collections.Generic;
+using System.Runtime.Serialization;
 
 namespace Cocktail
 {
@@ -46,7 +48,7 @@ namespace Cocktail
 		}
 	}
 
-	public class State //: ICloneable
+	public abstract class State //: ICloneable
 	{
 		static Random m_seed = new Random();
 
@@ -76,5 +78,14 @@ namespace Cocktail
 		{
 			return false;   //< can't merge if subclass didn't provide a Merge function
 		}
+
+		public virtual bool Merge(State rhs)
+		{
+			return false;
+		}
+
+		public virtual void Serialize(Stream ostream) { }
+		//public abstract IEnumerable<object> Properties { get; }
+
 	}
 }

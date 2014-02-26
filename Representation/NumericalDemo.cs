@@ -52,6 +52,7 @@ namespace Representation
 				// declare a function form for an event, which also means binding an event to one or a few state types
 				m_initialST.VMExecute("Cocktail.DeclareAndLink", "Initiate", typeof(Accounting).GetMethod("Initiate"));
 				m_initialST.VMExecute("Cocktail.DeclareAndLink", "Transfer", typeof(Accounting).GetMethod("Transfer"));
+				m_initialST.VMExecute("Cocktail.DeclareAndLink", "Deduct", typeof(Accounting).GetMethod("Deduct"));
 				//kernel.Declare("CreateAccount", FunctionForm.From(typeof(Accounting).GetMethod("CreateAccount")));
 			}
 
@@ -71,17 +72,29 @@ namespace Representation
 			}
 		}
 
+		RemoteStateRef GenRemoteRef(State state) { return new RemoteStateRef(state.StateId, state.GetType().ToString()); }
+
 		void UpdateWorld(float interval)
 		{
 			if (m_elapsed > 2 && m_pushFlag)
 			{
 				m_initialST.Execute("Transfer"
 					, Utils.MakeArgList( "fromAcc", new LocalStateRef<Account>(m_accounts[0])
-						, "toAcc", new RemoteStateRef(m_accounts[1].StateId, m_accounts[1].GetType().ToString()))
+						, "toAcc", GenRemoteRef(m_accounts[1]))
 					, (float)m_rand.Next(50));
 			}
 		}
 
+		private void MakeCollision()
+		{
+			m_initialST.Execute("Deduct"
+				,Utils.MakeArgList("account", new LocalStateRef<Account>(m_accounts[0]))
+				, 5.0);
+
+			m_secondST.Execute("Transfer"
+				, Utils.MakeArgList("fromAcc", GenRemoteRef(m_accounts[0]), "toAcc", GenRemoteRef(m_accounts[1]))
+				, 7.0);
+		}
 
 		public void Update(IRenderer renderer, double dt)
 		{
