@@ -8,6 +8,7 @@ using System.IO;
 using DOA;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
+using System.Reflection;
 
 namespace Cocktail
 {
@@ -33,13 +34,67 @@ namespace Cocktail
 	/// </summary>
 	public class VMState : State
 	{
-		public Interpreter Interpreter { get; private set; }
+		private Interpreter m_interpreter;
 
 		public VMState(Spacetime st, IHierarchicalTimestamp stamp)
 			:base(st,stamp)
 		{
-			Interpreter = new Interpreter();
-			Interpreter.DeclareAndLink("Cocktail.DeclareAndLink", typeof(Interpreter).GetMethod("DeclareAndLink_cocktail"));
+			m_interpreter = new Interpreter();
+			m_interpreter.DeclareAndLink("Cocktail.DeclareAndLink", typeof(Interpreter).GetMethod("DeclareAndLink_cocktail"));
+		}
+
+		public void DeclareAndLink(string name, MethodInfo methodInfo)
+		{
+			m_interpreter.DeclareAndLink(name, methodInfo);
+
+			var ostream = new MemoryStream();
+			SerializeDnL(ostream, name, methodInfo);
+			AddPatch(ostream);
+		}
+
+		public void Call(string eventName, IEnumerable<KeyValuePair<string, StateRef>> states, IEnumerable<object> constArgs)
+		{
+			m_interpreter.Call(eventName, states, constArgs);
+		}
+
+		public override bool Patch(IHierarchicalEvent fromRev, IHierarchicalEvent toRev, Stream delta)
+		{
+			if (toRev.LtEq(LatestUpdate.Event))
+				throw new ApplicationException("Trying to update to an older revision");
+
+			return TryDeserializeDnL(delta);
+		}
+
+		private Stream SerializeDnL(Stream ostream, string name, MethodInfo methodInfo)
+		{
+			var retval = ostream;
+			using(var writer = new BinaryWriter(retval))
+			{
+				writer.Write((char)0xD9);
+				writer.Write(name);
+				writer.Write(methodInfo.DeclaringType.FullName);
+				writer.Write(methodInfo.Name);
+			}
+			return retval;
+		}
+
+		private bool TryDeserializeDnL(Stream delta)
+		{
+			using (var reader = new BinaryReader(delta))
+			{
+				if (reader.PeekChar() != (char)0xD9)
+					return false;
+
+				reader.ReadChar();
+				var name = reader.ReadString();
+				var className = reader.ReadString();
+				var methodName = reader.ReadString();
+
+				var methodInfo = Type.GetType(className).GetMethod(methodName);
+
+				m_interpreter.DeclareAndLink(name, methodInfo);
+			}
+			return true;
 		}
 	}
 
@@ -60,7 +115,7 @@ namespace Cocktail
 		private IHierarchicalEvent m_executingEvent;
 		private VMState m_vm;
 		// we use cached state to "pro-act" on an event involves external states optimistically, and let the external ST denies it.
-		private Dictionary<IHierarchicalId, ExternalSTEntry> m_cachedExternalST;
+		private Dictionary<IHierarchicalId, ExternalSTEntry> m_cachedExternalST = new Dictionary<IHierarchicalId, ExternalSTEntry>();
 
 		public IHierarchicalId ID { get { return m_currentTime.ID; } }
 
@@ -70,12 +125,12 @@ namespace Cocktail
         }
 
 		public Spacetime(IHierarchicalId id, IHierarchicalEvent event_, IHierarchicalIdFactory idFactory)
-			:this(HierarchicalTimestampFactory.Make(id, event_), idFactory, Enumerable.Empty<State>())
+			:this(HTSFactory.Make(id, event_), idFactory, Enumerable.Empty<State>())
 		{
 		}
 
 		public Spacetime(IHierarchicalId id, IHierarchicalEvent event_, IHierarchicalIdFactory idFactory, IEnumerable<State> initialStates)
-			:this(HierarchicalTimestampFactory.Make(id, event_), idFactory, initialStates)
+			:this(HTSFactory.Make(id, event_), idFactory, initialStates)
 		{
 		}
 
@@ -209,12 +264,14 @@ namespace Cocktail
 
 		public bool ExecuteArgs(string funcName, IEnumerable<KeyValuePair<string,StateRef>> stateParams, IEnumerable<object> constArgs)
 		{
-			IHierarchicalEvent evt;
+			IHierarchicalEvent evtOriginal,evtFinal;
+			while ((evtOriginal = BeginAdvance()) == null) ;
+			evtFinal = evtOriginal;
+
 			// cross ST event
 			IEnumerable<TStateId> excluded;
 			if (!ContainAll(stateParams.Select((sp) => sp.Value.StateId), out excluded))
 			{
-				while ((evt = BeginAdvance()) == null) ;
 
 				//TODO:
 
@@ -222,11 +279,11 @@ namespace Cocktail
 
 				IHierarchicalTimestamp failingST = null;
 				// Fetch it from somewhere
-				foreach (var sp in stateParams.Where(kv => excluded.Contains(kv.Value.StateId)))
+				foreach (var sid in excluded)
 				{
-					var hid = NamingSvcClient.Instance.GetObjectSpaceTimeID(sp.Value.StateId.ToString());
+					var hid = NamingSvcClient.Instance.GetObjectSpaceTimeID(sid.ToString());
 					var st = SyncManager.Instance.GetSpacetime(hid);
-					if (!MergeSpacetime(st.Key, st.Value, ref evt))
+					if (!MergeSpacetime(st.Key, st.Value, ref evtFinal))
 					{
 						failingST = st.Key;
 						break;
@@ -235,16 +292,15 @@ namespace Cocktail
 				
 				// failed to merge foreign ST
 				if (failingST != null)
+				{
+					AbortAdvance();
 					return false;
-			}
-			else
-			{
-				while ((evt = BeginAdvance()) == null) ;
+				}
 			}
 
 
-			m_vm.Interpreter.Call(funcName, stateParams, constArgs.ToArray());
-			CommitAdvance(evt);
+			m_vm.Call(funcName, stateParams, constArgs.ToArray());
+			CommitAdvance(evtOriginal, evtFinal);
 			return true;
 		}
 
@@ -270,7 +326,7 @@ namespace Cocktail
 			{
 				m_cachedExternalST.Add(foreignST.ID, new ExternalSTEntry() { LatestUpateTime = foreignST, States = foreignStates.ToDictionary(s => s.StateId) });
 			}
-			var localTime = HierarchicalTimestampFactory.Make(ID, expectingEvent);
+			var localTime = HTSFactory.Make(ID, expectingEvent);
 			expectingEvent = localTime.Join(foreignST).Event;
 			return true;
 		}
@@ -311,21 +367,28 @@ namespace Cocktail
             return newTime.Event;
         }
 
-        private bool CommitAdvance(IHierarchicalEvent event_)
+		private void CommitAdvance(IHierarchicalEvent evt) { CommitAdvance(evt, evt); }
+
+        private void CommitAdvance(IHierarchicalEvent evtOriginal, IHierarchicalEvent evtFinal)
         {
-			// If current time is compatible to committing event
-            if (m_currentTime.Event.LtEq(event_))
-            {
-				var oldVal = Interlocked.CompareExchange(ref m_executingEvent, null, event_);
-				if (oldVal != event_)
-					throw new ApplicationException("Race condition on m_executingEvent");
+			// If current time is not compatible to committing event
+            if (!m_currentTime.Event.LtEq(evtFinal))
+				throw new ApplicationException("The event is out dated, recalculation needed");
 
-                m_currentTime = new ITCTimestamp(m_currentTime.ID as ITCIdentity, event_ as ITCEvent);
-                return true;
-            }
+			// This check is not mature, event value could grow further if sync/merge involved
+			//var oldVal = Interlocked.CompareExchange(ref m_executingEvent, null, event_);
+			//if (oldVal != event_)
+			//    throw new ApplicationException("Race condition on m_executingEvent");
 
-            return false;
+			Interlocked.Exchange(ref m_executingEvent, null);
+
+			m_currentTime = new ITCTimestamp(m_currentTime.ID as ITCIdentity, evtFinal as ITCEvent);
         }
+
+		private void AbortAdvance()
+		{
+			Interlocked.Exchange(ref m_executingEvent, null);
+		}
 
 		#region ISerializable Members
 

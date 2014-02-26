@@ -53,7 +53,7 @@ namespace Representation
                 // (p).GodPush([1,1,0]);
                 m_pushFlag = false;
                 foreach (var p in m_particles)
-                    kernel.Call("GodPush", null, Utils.MakeArgList("body", new LocalStateRef<Particle>(p)), new Vector3(1.0f,1.0f,0).Random(m_rand));
+                    kernel.Callva("GodPush", null, Utils.MakeArgList("body", new LocalStateRef<Particle>(p)), new Vector3(1.0f,1.0f,0).Random(m_rand));
             }
 
             foreach (var p in m_particles)

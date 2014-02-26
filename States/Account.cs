@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using Cocktail;
 using HTS;
+using System.IO;
 
 namespace CollisionTest.States
 {
@@ -19,6 +20,16 @@ namespace CollisionTest.States
 			if (Balance != rhsAcc.Balance)
 				return false;
 			return true;
+		}
+
+		public override bool Patch(IHierarchicalEvent fromRev, IHierarchicalEvent toRev, Stream delta)
+		{
+			throw new Exception("The method or operation is not implemented.");
+		}
+
+		protected override void AddPatch(Stream delta)
+		{
+			throw new Exception("The method or operation is not implemented.");
 		}
     }
 }

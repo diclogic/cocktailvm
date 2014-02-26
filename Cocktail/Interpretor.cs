@@ -175,7 +175,7 @@ namespace Cocktail
 
 		public static void DeclareAndLink_cocktail([State] VMState VM, string name, MethodInfo methodInfo)
 		{
-			VM.Interpreter.DeclareAndLink(name, methodInfo);
+			VM.DeclareAndLink(name, methodInfo);
 		}
 
 		// TODO: implement
@@ -187,7 +187,11 @@ namespace Cocktail
 
 		}
 
-		public void Call(string eventName, Spacetime mainST, IEnumerable<KeyValuePair<string, StateRef>> states, params object[] constArgs)
+		public void Callva(string eventName, IEnumerable<KeyValuePair<string, StateRef>> states, params object[] constArgs)
+		{
+			Call(eventName, states, constArgs);
+		}
+		public void Call(string eventName, IEnumerable<KeyValuePair<string, StateRef>> states, IEnumerable<object> constArgs)
 		{
 			var stateParams = GenStateParams(states);
 			var constTypes = constArgs.Select<object,Type>((o)=>o.GetType());

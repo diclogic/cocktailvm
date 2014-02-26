@@ -48,13 +48,22 @@ namespace Cocktail
 		}
 	}
 
+	public class StatePatch
+	{
+		public IHierarchicalEvent FromRev;
+		public IHierarchicalEvent ToRev;
+		public Stream delta;
+	}
+
 	public abstract class State //: ICloneable
 	{
 		static Random m_seed = new Random();
 
 		private Spacetime m_spaceTime;					//< the space-time it belongs to
+		private StatePatch m_pendingPatch;
+
 		public TStateId StateId { get; protected set; }	//< to identify a state
-		public IHierarchicalTimestamp LatestUpdate;
+		public IHierarchicalTimestamp LatestUpdate { get; private set; }
 
 
 		public State(Spacetime spaceTime, IHierarchicalTimestamp stamp)
@@ -82,6 +91,27 @@ namespace Cocktail
 		public virtual bool Merge(State rhs)
 		{
 			return false;
+		}
+
+		public virtual bool Patch(IHierarchicalEvent fromRev, IHierarchicalEvent toRev, Stream delta) { return true; }
+		protected virtual void AddPatch(Stream delta)
+		{
+			if (m_pendingPatch != null)
+				throw new ApplicationException("Trying to patch a state twice in one execution");
+
+			m_pendingPatch = new StatePatch() { FromRev = LatestUpdate.Event, delta = delta };
+		}
+		public virtual StatePatch FinishPatch(IHierarchicalEvent toRev)
+		{
+			LatestUpdate = HTSFactory.Make(LatestUpdate.ID, toRev);
+
+			if (m_pendingPatch == null)
+				return null;
+
+			m_pendingPatch.ToRev = toRev;
+			var retval = m_pendingPatch;
+			m_pendingPatch = null;
+			return retval;
 		}
 
 		public virtual void Serialize(Stream ostream) { }

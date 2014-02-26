@@ -9,7 +9,7 @@ namespace DOA
 {
 	public class SyncManager
 	{
-		private Dictionary<IHierarchicalId, Spacetime> m_spaceTimes;
+		private Dictionary<IHierarchicalId, Spacetime> m_spaceTimes = new Dictionary<IHierarchicalId, Spacetime>();
 		private object m_lock = new object();
 
 		public static SyncManager Instance = new SyncManager();

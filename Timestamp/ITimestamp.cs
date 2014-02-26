@@ -14,7 +14,7 @@ namespace HTS
 		IHierarchicalTimestamp Join(IHierarchicalTimestamp rhs);
     }
 
-	public static class HierarchicalTimestampFactory
+	public static class HTSFactory
 	{
 		public static IHierarchicalTimestamp NullValue = new ITCTimestamp(ITCIdentity.Null, ITCEvent.CreateZero());
 		public static IHierarchicalTimestamp Make(IHierarchicalId id, IHierarchicalEvent event_)
