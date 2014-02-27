@@ -28,76 +28,6 @@ namespace Cocktail
 		public IHierarchicalTimestamp LatestUpateTime;
 		public Dictionary<TStateId,State> States;
 	}
-
-	/// <summary>
-	/// VM is a special state. It has version. It can only be changed/updated only by deployment system
-	/// </summary>
-	public class VMState : State
-	{
-		private Interpreter m_interpreter;
-
-		public VMState(Spacetime st, IHierarchicalTimestamp stamp)
-			:base(st,stamp)
-		{
-			m_interpreter = new Interpreter();
-			m_interpreter.DeclareAndLink("Cocktail.DeclareAndLink", typeof(Interpreter).GetMethod("DeclareAndLink_cocktail"));
-		}
-
-		public void DeclareAndLink(string name, MethodInfo methodInfo)
-		{
-			m_interpreter.DeclareAndLink(name, methodInfo);
-
-			var ostream = new MemoryStream();
-			SerializeDnL(ostream, name, methodInfo);
-			AddPatch(ostream);
-		}
-
-		public void Call(string eventName, IEnumerable<KeyValuePair<string, StateRef>> states, IEnumerable<object> constArgs)
-		{
-			m_interpreter.Call(eventName, states, constArgs);
-		}
-
-		public override bool Patch(IHierarchicalEvent fromRev, IHierarchicalEvent toRev, Stream delta)
-		{
-			if (toRev.LtEq(LatestUpdate.Event))
-				throw new ApplicationException("Trying to update to an older revision");
-
-			return TryDeserializeDnL(delta);
-		}
-
-		private Stream SerializeDnL(Stream ostream, string name, MethodInfo methodInfo)
-		{
-			var retval = ostream;
-			using(var writer = new BinaryWriter(retval))
-			{
-				writer.Write((char)0xD9);
-				writer.Write(name);
-				writer.Write(methodInfo.DeclaringType.FullName);
-				writer.Write(methodInfo.Name);
-			}
-			return retval;
-		}
-
-		private bool TryDeserializeDnL(Stream delta)
-		{
-			using (var reader = new BinaryReader(delta))
-			{
-				if (reader.PeekChar() != (char)0xD9)
-					return false;
-
-				reader.ReadChar();
-				var name = reader.ReadString();
-				var className = reader.ReadString();
-				var methodName = reader.ReadString();
-
-				var methodInfo = Type.GetType(className).GetMethod(methodName);
-
-				m_interpreter.DeclareAndLink(name, methodInfo);
-			}
-			return true;
-		}
-	}
-
     /// <summary>
     /// the SpaceTime represents the development of objects
     /// it is a thread apartment that can include one to many objects
@@ -110,8 +40,9 @@ namespace Cocktail
         private IHierarchicalIdFactory m_idFactory;
         private IHierarchicalTimestamp m_currentTime;
 		private Dictionary<TStateId, State> m_states;
+		private Dictionary<TStateId, State> m_nativeStates;
 		private object m_executionLock = new object();
-		private SortedList<IHierarchicalEvent, ExecutionFraction> m_incomingExecutions;
+		private SortedList<IHierarchicalEvent, ExecutionFraction> m_incomingExecutions = new SortedList<IHierarchicalEvent, ExecutionFraction>();
 		private IHierarchicalEvent m_executingEvent;
 		private VMState m_vm;
 		// we use cached state to "pro-act" on an event involves external states optimistically, and let the external ST denies it.
@@ -139,7 +70,9 @@ namespace Cocktail
 			m_currentTime = stamp;
 			m_idFactory = idFactory;
 			m_states = initialStates.ToDictionary((s) => s.StateId);
+			m_nativeStates = initialStates.ToDictionary((s) => s.StateId);
 			m_vm = (VMState)CreateState((st,_stamp) => new VMState(st,_stamp));
+
 		}
 
 		public State CreateState(Func<Spacetime, IHierarchicalTimestamp, State> constructor)
@@ -147,6 +80,7 @@ namespace Cocktail
             var event_ = BeginAdvance();
             var newState = constructor(this, m_currentTime);
 			m_states.Add(newState.StateId, newState);
+			m_nativeStates.Add(newState.StateId, newState);
             CommitAdvance(event_);
             return newState;
         }
@@ -306,26 +240,24 @@ namespace Cocktail
 
 		private bool MergeSpacetime(IHierarchicalTimestamp foreignST, IEnumerable<State> foreignStates, ref IHierarchicalEvent expectingEvent)
 		{
-			ExternalSTEntry entry;
-			if (m_cachedExternalST.TryGetValue(foreignST.ID, out entry))
+			// all states are put into m_states
+			var newStates = new Dictionary<TStateId, State>();
+			foreach (var fst in foreignStates)
 			{
-				var newStates = new Dictionary<TStateId, State>();
-				foreach (var fst in foreignStates)
+				State lst;
+				if (m_states.TryGetValue(fst.StateId, out lst))
 				{
-					State lst;
-					if (entry.States.TryGetValue(fst.StateId, out lst))
-					{
-						if (!lst.Merge(fst))
-							return false;
-					}
-					newStates.Add(fst.StateId, lst ?? fst);
+					if (!lst.Merge(fst))
+						return false;
 				}
-				entry.States = newStates;
+				newStates.Add(fst.StateId, lst ?? fst);
 			}
-			else
-			{
-				m_cachedExternalST.Add(foreignST.ID, new ExternalSTEntry() { LatestUpateTime = foreignST, States = foreignStates.ToDictionary(s => s.StateId) });
-			}
+
+			ExternalSTEntry entry;
+			entry.LatestUpateTime = foreignST;
+			entry.States = newStates;
+			m_cachedExternalST.Add(foreignST.ID, entry);
+
 			var localTime = HTSFactory.Make(ID, expectingEvent);
 			expectingEvent = localTime.Join(foreignST).Event;
 			return true;

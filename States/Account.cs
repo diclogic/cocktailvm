@@ -11,9 +11,10 @@ namespace CollisionTest.States
     [State]
     public class Account : State
     {
-        public Account(Spacetime spaceTime, IHierarchicalTimestamp stamp) : base(spaceTime,stamp) { }
-        public float Balance;
+		[StateField(PatchKind=FieldPatchKind.Delta)]
+		public float Balance;
 
+        public Account(Spacetime spaceTime, IHierarchicalTimestamp stamp) : base(spaceTime,stamp) { }
 		public override bool Merge(State rhs)
 		{
 			var rhsAcc = rhs as Account;
@@ -22,14 +23,9 @@ namespace CollisionTest.States
 			return true;
 		}
 
-		public override bool Patch(IHierarchicalEvent fromRev, IHierarchicalEvent toRev, Stream delta)
+		public virtual void SerializePatch(Stream ostream, State oldState)
 		{
-			throw new Exception("The method or operation is not implemented.");
-		}
-
-		protected override void AddPatch(Stream delta)
-		{
-			throw new Exception("The method or operation is not implemented.");
+			StatePatcher.GeneratePatch(ostream, this, oldState);
 		}
     }
 }

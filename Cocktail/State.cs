@@ -48,29 +48,28 @@ namespace Cocktail
 		}
 	}
 
-	public class StatePatch
-	{
-		public IHierarchicalEvent FromRev;
-		public IHierarchicalEvent ToRev;
-		public Stream delta;
-	}
-
 	public abstract class State //: ICloneable
 	{
 		static Random m_seed = new Random();
 
 		private Spacetime m_spaceTime;					//< the space-time it belongs to
 		private StatePatch m_pendingPatch;
+		private readonly StatePatchMethod m_patchMethod;
 
 		public TStateId StateId { get; protected set; }	//< to identify a state
 		public IHierarchicalTimestamp LatestUpdate { get; private set; }
 
-
 		public State(Spacetime spaceTime, IHierarchicalTimestamp stamp)
+			: this(spaceTime, stamp, StatePatchMethod.Auto)
+		{
+		}
+
+		public State(Spacetime spaceTime, IHierarchicalTimestamp stamp, StatePatchMethod patchMethod)
 		{
 			StateId = new TStateId(m_seed);
 			m_spaceTime = spaceTime;
 			LatestUpdate = stamp;
+			m_patchMethod = patchMethod;
 		}
 
 		//public object Clone()
@@ -93,7 +92,29 @@ namespace Cocktail
 			return false;
 		}
 
-		public virtual bool Patch(IHierarchicalEvent fromRev, IHierarchicalEvent toRev, Stream delta) { return true; }
+		public bool Patch(IHierarchicalEvent fromRev, IHierarchicalEvent toRev, Stream delta)
+		{
+			if (toRev.LtEq(LatestUpdate.Event))
+				throw new ApplicationException("Trying to update to an older revision");
+			if (m_patchMethod == StatePatchMethod.Auto)
+			{
+				try
+				{
+					StatePatcher.PatchState(delta, this);
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine("Failed to auto-patch state ({0}) from {1} to {2} with exception:\n{3}", StateId, fromRev.ToString(), toRev.ToString(), ex.ToString());
+					return false;
+				}
+			}
+			else
+			{
+				return DoPatch(delta);
+			}
+			return true;
+		}
+		protected virtual bool DoPatch(Stream delta) { return false; }
 		protected virtual void AddPatch(Stream delta)
 		{
 			if (m_pendingPatch != null)

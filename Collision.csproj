@@ -52,7 +52,9 @@
     <Compile Include="Cocktail\Parameter.cs" />
     <Compile Include="Cocktail\SpaceTime.cs" />
     <Compile Include="Cocktail\State.cs" />
+    <Compile Include="Cocktail\StatePatching.cs" />
     <Compile Include="Cocktail\StateRef.cs" />
+    <Compile Include="Cocktail\VMState.cs" />
     <Compile Include="DOA\DoaNamingSvcClient.cs" />
     <Compile Include="DOA\SyncManager.cs" />
     <Compile Include="Newton.cs" />
