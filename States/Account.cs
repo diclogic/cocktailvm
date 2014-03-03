@@ -15,17 +15,12 @@ namespace CollisionTest.States
 		public float Balance;
 
         public Account(Spacetime spaceTime, IHierarchicalTimestamp stamp) : base(spaceTime,stamp) { }
-		public override bool Merge(State rhs)
+		public override bool Merge(StateSnapshot snapshot, StatePatch patch)
 		{
-			var rhsAcc = rhs as Account;
-			if (Balance != rhsAcc.Balance)
+			if (Balance != (float)snapshot.Fields.First(f=>f.Name == "Balance").Value)
 				return false;
-			return true;
-		}
 
-		public virtual void SerializePatch(Stream ostream, State oldState)
-		{
-			StatePatcher.GeneratePatch(ostream, this, oldState);
+			return base.Merge(snapshot, patch);
 		}
     }
 }

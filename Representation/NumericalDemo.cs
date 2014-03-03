@@ -39,8 +39,8 @@ namespace Representation
 			m_secondST = new Spacetime(m_idFactory.CreateFromRoot(), ITCEvent.CreateZero(), m_idFactory);
 			m_spacetimes.Add(m_initialST);
 			m_spacetimes.Add(m_secondST);
-			SyncManager.Instance.RegisterSpaceTime(m_initialST);
-			SyncManager.Instance.RegisterSpaceTime(m_secondST);
+			PseudoSyncMgr.Instance.RegisterSpaceTime(m_initialST);
+			PseudoSyncMgr.Instance.RegisterSpaceTime(m_secondST);
 
 			var newAccount = m_initialST.CreateState((st, stamp) => new Account(st, stamp));
 			m_namingSvc.RegisterObject(newAccount.StateId.ToString(), newAccount.GetType().ToString(), newAccount);

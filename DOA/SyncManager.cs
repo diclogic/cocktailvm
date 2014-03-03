@@ -7,16 +7,15 @@ using HTS;
 
 namespace DOA
 {
-	public class SyncManager
+
+	public class PseudoSyncMgr
 	{
 		private Dictionary<IHierarchicalId, Spacetime> m_spaceTimes = new Dictionary<IHierarchicalId, Spacetime>();
 		private object m_lock = new object();
 
-		public static SyncManager Instance = new SyncManager();
-		public static KeyValuePair<IHierarchicalTimestamp, IEnumerable<State>> NullSpacetime
-			= new KeyValuePair<IHierarchicalTimestamp, IEnumerable<State>>(null, Enumerable.Empty<State>());
+		public static PseudoSyncMgr Instance = new PseudoSyncMgr();
 
-		private SyncManager() { }
+		private PseudoSyncMgr() { }
 
 		public void RegisterSpaceTime(Spacetime st)
 		{
@@ -26,7 +25,7 @@ namespace DOA
 			}
 		}
 
-		public KeyValuePair<IHierarchicalTimestamp, IEnumerable<State>> GetSpacetime(IHierarchicalId id)
+		public SpacetimeSnapshot? GetSpacetime(IHierarchicalId id)
 		{
 			lock (m_lock)
 			{
@@ -34,7 +33,7 @@ namespace DOA
 				if (m_spaceTimes.TryGetValue(id, out st))
 					return st.Snapshot();
 
-				return NullSpacetime;
+				return null;
 			}
 		}
 

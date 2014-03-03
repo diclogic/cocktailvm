@@ -9,6 +9,9 @@ using DOA;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Reflection;
+using System.Collections.Concurrent;
+
+using SnapshotPair = itcsharp.Pair<Cocktail.State,Cocktail.StateSnapshot>;
 
 namespace Cocktail
 {
@@ -28,6 +31,14 @@ namespace Cocktail
 		public IHierarchicalTimestamp LatestUpateTime;
 		public Dictionary<TStateId,State> States;
 	}
+
+	public struct SpacetimeSnapshot
+	{
+		public IHierarchicalTimestamp Timestamp;
+		public IEnumerable<State> States;
+		public IEnumerable<KeyValuePair<TStateId, List<StatePatch>>> Redos;
+	}
+
     /// <summary>
     /// the SpaceTime represents the development of objects
     /// it is a thread apartment that can include one to many objects
@@ -41,6 +52,7 @@ namespace Cocktail
         private IHierarchicalTimestamp m_currentTime;
 		private Dictionary<TStateId, State> m_states;
 		private Dictionary<TStateId, State> m_nativeStates;
+		private ConcurrentDictionary<TStateId, List<StatePatch>> m_stateRedos = new ConcurrentDictionary<TStateId, List<StatePatch>>();
 		private object m_executionLock = new object();
 		private SortedList<IHierarchicalEvent, ExecutionFraction> m_incomingExecutions = new SortedList<IHierarchicalEvent, ExecutionFraction>();
 		private IHierarchicalEvent m_executingEvent;
@@ -103,11 +115,11 @@ namespace Cocktail
 			}
 		}
 
-		public KeyValuePair<IHierarchicalTimestamp,IEnumerable<State>> Snapshot()
+		public SpacetimeSnapshot Snapshot()
 		{
 			lock (m_executionLock)
 			{
-				return new KeyValuePair<IHierarchicalTimestamp, IEnumerable<State>>(m_currentTime, m_states.Values);
+				return new SpacetimeSnapshot() { Timestamp = m_currentTime, States = m_states.Values, Redos = m_stateRedos };
 			}
 		}
 
@@ -183,9 +195,9 @@ namespace Cocktail
 				{
 					foreach (var stateIn in exec.affectedStates)
 					{
-						State state;
-						if (m_states.TryGetValue(stateIn.Key, out state))
-							state.Merge(stateIn.Value);
+						//State state;
+						//if (m_states.TryGetValue(stateIn.Key, out state))
+						//    state.Merge(stateIn.Value);
 					}
 				}
 			}
@@ -203,23 +215,26 @@ namespace Cocktail
 			evtFinal = evtOriginal;
 
 			// cross ST event
-			IEnumerable<TStateId> excluded;
-			if (!ContainAll(stateParams.Select((sp) => sp.Value.StateId), out excluded))
+			IEnumerable<TStateId> nativeIds, foreignIds;
+			SplitStateParams(stateParams.Select((sp) => sp.Value.StateId), out nativeIds, out foreignIds);
+
+			var foreignSTs = new HashSet<IHierarchicalId>();
+			if (foreignIds.Count() > 0)
 			{
-
-				//TODO:
-
-				// Use local cache first
-
-				IHierarchicalTimestamp failingST = null;
 				// Fetch it from somewhere
-				foreach (var sid in excluded)
+				foreach (var sid in foreignIds)
 				{
 					var hid = NamingSvcClient.Instance.GetObjectSpaceTimeID(sid.ToString());
-					var st = SyncManager.Instance.GetSpacetime(hid);
-					if (!MergeSpacetime(st.Key, st.Value, ref evtFinal))
+					foreignSTs.Add(hid);
+				}
+
+				IHierarchicalTimestamp failingST = null;
+				foreach (var hid in foreignSTs)
+				{
+					var st = PseudoSyncMgr.Instance.GetSpacetime(hid);
+					if (!MergeSpacetime(st.Value.Timestamp, st.Value.States, st.Value.Redos, ref evtFinal))
 					{
-						failingST = st.Key;
+						failingST = st.Value.Timestamp;
 						break;
 					}
 				}
@@ -232,14 +247,46 @@ namespace Cocktail
 				}
 			}
 
+			var states = stateParams.Select(sp => m_states[sp.Value.StateId]);
+			var oldSnapshots = new List<StateSnapshot>();
+			foreach (var ns in states)
+				oldSnapshots.Add(ns.GetSnapshot());
 
 			m_vm.Call(funcName, stateParams, constArgs.ToArray());
+
+			foreach (var spair in
+						from s1 in states join s2 in oldSnapshots on s1.StateId equals s2.ID 
+						select new SnapshotPair(s1,s2))
+			{
+				var ostream = new MemoryStream();
+				spair.First.Serialize(ostream, spair.Second);
+				var patch = new StatePatch()
+				{
+					FromRev = spair.Second.Timestamp.Event,
+					ToRev = evtFinal,
+					delta = ostream
+				};
+				m_stateRedos.GetOrAdd(spair.First.StateId, new List<StatePatch>()).Add(patch);
+			}
+
+			// Send "pull request" to spacetimes whose non-commutative sates we changed
+			foreach (var fst in foreignSTs)
+			{
+				// FIXME:
+				//PseudoSyncMgr.
+			}
+
 			CommitAdvance(evtOriginal, evtFinal);
+
+			// Push native changes to other spacetimes that are aware of us
+			//PseudoSyncMgr.Instance.
+
 			return true;
 		}
 
-		private bool MergeSpacetime(IHierarchicalTimestamp foreignST, IEnumerable<State> foreignStates, ref IHierarchicalEvent expectingEvent)
+		private bool MergeSpacetime(IHierarchicalTimestamp foreignStamp, IEnumerable<State> foreignStates, IEnumerable<KeyValuePair<TStateId, List<StatePatch>>> redos, ref IHierarchicalEvent expectingEvent)
 		{
+			ILookup<TStateId, List<StatePatch>> redoDict = redos.ToLookup(kv => kv.Key, kv => kv.Value);
 			// all states are put into m_states
 			var newStates = new Dictionary<TStateId, State>();
 			foreach (var fst in foreignStates)
@@ -247,19 +294,21 @@ namespace Cocktail
 				State lst;
 				if (m_states.TryGetValue(fst.StateId, out lst))
 				{
-					if (!lst.Merge(fst))
-						return false;
+					foreach (var redo in redoDict[fst.StateId])
+						foreach (var patch in redo)
+							if (!lst.Merge(fst.GetSnapshot(), patch))
+								return false;
 				}
 				newStates.Add(fst.StateId, lst ?? fst);
 			}
 
 			ExternalSTEntry entry;
-			entry.LatestUpateTime = foreignST;
+			entry.LatestUpateTime = foreignStamp;
 			entry.States = newStates;
-			m_cachedExternalST.Add(foreignST.ID, entry);
+			m_cachedExternalST.Add(foreignStamp.ID, entry);
 
 			var localTime = HTSFactory.Make(ID, expectingEvent);
-			expectingEvent = localTime.Join(foreignST).Event;
+			expectingEvent = localTime.Join(foreignStamp).Event;
 			return true;
 		}
 
@@ -274,10 +323,10 @@ namespace Cocktail
 				, constArgs);
 		}
 
-		private bool ContainAll(IEnumerable<TStateId> stateIds, out IEnumerable<TStateId> excluded)
+		private void SplitStateParams(IEnumerable<TStateId> stateIds, out IEnumerable<TStateId> natives, out IEnumerable<TStateId> externals)
 		{
-			excluded = stateIds.Except(m_states.Keys);
-			return excluded.FirstOrDefault().IsNull();
+			natives = stateIds.Intersect(m_nativeStates.Keys);
+			externals = stateIds.Except(natives);
 		}
 
         public IHierarchicalEvent Advance()

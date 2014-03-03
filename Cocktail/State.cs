@@ -1,8 +1,10 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using HTS;
 using System.Collections.Generic;
 using System.Runtime.Serialization;
+using System.Reflection;
 
 namespace Cocktail
 {
@@ -82,20 +84,21 @@ namespace Cocktail
 			return LatestUpdate.Event.LtEq(stamp.Event);
 		}
 
-		public virtual bool Merge(Stream newState)
+		public virtual bool Merge(StateSnapshot snapshot, StatePatch patch)
 		{
-			return false;   //< can't merge if subclass didn't provide a Merge function
+			return Patch(patch);
 		}
 
-		public virtual bool Merge(State rhs)
+		public bool Patch(StatePatch patch)
 		{
-			return false;
+			return Patch(patch.FromRev, patch.ToRev, patch.delta);
 		}
 
 		public bool Patch(IHierarchicalEvent fromRev, IHierarchicalEvent toRev, Stream delta)
 		{
 			if (toRev.LtEq(LatestUpdate.Event))
 				throw new ApplicationException("Trying to update to an older revision");
+
 			if (m_patchMethod == StatePatchMethod.Auto)
 			{
 				try
@@ -115,28 +118,33 @@ namespace Cocktail
 			return true;
 		}
 		protected virtual bool DoPatch(Stream delta) { return false; }
-		protected virtual void AddPatch(Stream delta)
+
+		public IEnumerable<FieldInfo> GetFields() { return GetFields(FieldPatchKind.All); }
+		public IEnumerable<FieldInfo> GetFields(FieldPatchKind kinds)
 		{
-			if (m_pendingPatch != null)
-				throw new ApplicationException("Trying to patch a state twice in one execution");
-
-			m_pendingPatch = new StatePatch() { FromRev = LatestUpdate.Event, delta = delta };
-		}
-		public virtual StatePatch FinishPatch(IHierarchicalEvent toRev)
-		{
-			LatestUpdate = HTSFactory.Make(LatestUpdate.ID, toRev);
-
-			if (m_pendingPatch == null)
-				return null;
-
-			m_pendingPatch.ToRev = toRev;
-			var retval = m_pendingPatch;
-			m_pendingPatch = null;
-			return retval;
+			var fields = GetType().GetFields(BindingFlags.Instance | BindingFlags.DeclaredOnly | BindingFlags.Public | BindingFlags.NonPublic);
+			return fields.Where(fi =>
+				{
+					var attr = (StateFieldAttribute)fi.GetCustomAttributes(typeof(StateFieldAttribute), false).FirstOrDefault();
+					return attr != null && ((attr.PatchKind & kinds) != 0);
+				});
 		}
 
-		public virtual void Serialize(Stream ostream) { }
+		public void Serialize(Stream ostream, StateSnapshot oldSnapshot)
+		{
+			if (m_patchMethod == StatePatchMethod.Auto)
+			{
+				StatePatcher.GeneratePatch(ostream, this.GetSnapshot(), oldSnapshot);
+			}
+			else
+			{
+				DoSerialize(ostream, oldSnapshot);
+			}
+
+		}
+		public virtual void DoSerialize(Stream ostream, StateSnapshot oldSnapshot) { }
 		//public abstract IEnumerable<object> Properties { get; }
 
 	}
 }
+
