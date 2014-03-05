@@ -36,7 +36,7 @@ namespace Cocktail
 	{
 		public IHierarchicalTimestamp Timestamp;
 		public IEnumerable<State> States;
-		public IEnumerable<KeyValuePair<TStateId, List<StatePatch>>> Redos;
+		public ILookup<TStateId, StatePatch> Redos;
 	}
 
     /// <summary>
@@ -48,11 +48,18 @@ namespace Cocktail
     /// </summary>
 	public class Spacetime //: ISerializable
 	{
+		private class RedoEntry
+		{
+			public IHierarchicalEvent Rev;
+			public List<IHierarchicalId> AffectedSTs = new List<IHierarchicalId>();
+			public Dictionary<TStateId, StatePatch> LocalChanges = new Dictionary<TStateId, StatePatch>();
+		}
+
         private IHierarchicalIdFactory m_idFactory;
         private IHierarchicalTimestamp m_currentTime;
 		private Dictionary<TStateId, State> m_states;
 		private Dictionary<TStateId, State> m_nativeStates;
-		private ConcurrentDictionary<TStateId, List<StatePatch>> m_stateRedos = new ConcurrentDictionary<TStateId, List<StatePatch>>();
+		private List<RedoEntry> m_RedoList = new List<RedoEntry>();
 		private object m_executionLock = new object();
 		private SortedList<IHierarchicalEvent, ExecutionFraction> m_incomingExecutions = new SortedList<IHierarchicalEvent, ExecutionFraction>();
 		private IHierarchicalEvent m_executingEvent;
@@ -93,7 +100,13 @@ namespace Cocktail
             var newState = constructor(this, m_currentTime);
 			m_states.Add(newState.StateId, newState);
 			m_nativeStates.Add(newState.StateId, newState);
-            CommitAdvance(event_);
+
+			var redo = new RedoEntry();
+
+			var patch = StatePatcher.GeneratePatch(newState.GetSnapshot(event_), m_currentTime.Event);
+			redo.LocalChanges.Add(newState.StateId, patch);
+
+            CommitAdvance(event_, redo);
             return newState;
         }
 
@@ -119,7 +132,18 @@ namespace Cocktail
 		{
 			lock (m_executionLock)
 			{
-				return new SpacetimeSnapshot() { Timestamp = m_currentTime, States = m_states.Values, Redos = m_stateRedos };
+				return new SpacetimeSnapshot() { 
+					Timestamp = m_currentTime,
+					States = m_states.Values,
+					Redos = m_RedoList.Aggregate(new List<KeyValuePair<TStateId, StatePatch>>(),
+												(accu,item) =>
+													{
+														foreach (var sp in item.LocalChanges)
+															accu.Add(sp);
+														return accu;
+													}
+												).ToLookup(kv => kv.Key, kv => kv.Value)
+				};
 			}
 		}
 
@@ -146,19 +170,23 @@ namespace Cocktail
 		/// </summary>
 		public IEnumerable<Spacetime> SplitForEach()
 		{
-			int count = m_states.Count;
+			int count = m_nativeStates.Count;
 			if (count <= 1)
 				return new Spacetime[] { this };
 			var ids = m_idFactory.CreateChildren(ID, count);
-			var event_ = Advance();
+			var event_ = BeginAdvance();
 
+			var redo = new RedoEntry();
 
-			var iter = m_states.Values.GetEnumerator();
-			return ids.Select((id) =>
+			var iter = m_nativeStates.Values.GetEnumerator();
+			var retval = ids.Select((id) =>
 				{
 					iter.MoveNext();
+					redo.LocalChanges.Add(iter.Current.StateId, StatePatcher.GeneratePatch(event_, iter.Current.GetSnapshot()));
 					return new Spacetime(id, event_, m_idFactory, new State[] { iter.Current });
 				});
+			CommitAdvance(event_, redo);
+			return retval;
 		}
 
 		public static Spacetime Merge(IEnumerable<Spacetime> spaces)
@@ -254,6 +282,10 @@ namespace Cocktail
 
 			m_vm.Call(funcName, stateParams, constArgs.ToArray());
 
+			var redo = new RedoEntry();
+			redo.AffectedSTs = foreignSTs.ToList();
+			redo.LocalChanges = new Dictionary<TStateId, StatePatch>();
+
 			foreach (var spair in
 						from s1 in states join s2 in oldSnapshots on s1.StateId equals s2.ID 
 						select new SnapshotPair(s1,s2))
@@ -266,7 +298,7 @@ namespace Cocktail
 					ToRev = evtFinal,
 					delta = ostream
 				};
-				m_stateRedos.GetOrAdd(spair.First.StateId, new List<StatePatch>()).Add(patch);
+				redo.LocalChanges.Add(spair.First.StateId, patch);
 			}
 
 			// Send "pull request" to spacetimes whose non-commutative sates we changed
@@ -276,7 +308,9 @@ namespace Cocktail
 				//PseudoSyncMgr.
 			}
 
-			CommitAdvance(evtOriginal, evtFinal);
+			
+
+			CommitAdvance(evtOriginal, evtFinal, redo);
 
 			// Push native changes to other spacetimes that are aware of us
 			//PseudoSyncMgr.Instance.
@@ -284,9 +318,9 @@ namespace Cocktail
 			return true;
 		}
 
-		private bool MergeSpacetime(IHierarchicalTimestamp foreignStamp, IEnumerable<State> foreignStates, IEnumerable<KeyValuePair<TStateId, List<StatePatch>>> redos, ref IHierarchicalEvent expectingEvent)
+		private bool MergeSpacetime(IHierarchicalTimestamp foreignStamp, IEnumerable<State> foreignStates, ILookup<TStateId, StatePatch> redos, ref IHierarchicalEvent expectingEvent)
 		{
-			ILookup<TStateId, List<StatePatch>> redoDict = redos.ToLookup(kv => kv.Key, kv => kv.Value);
+			var redoDict = redos;
 			// all states are put into m_states
 			var newStates = new Dictionary<TStateId, State>();
 			foreach (var fst in foreignStates)
@@ -294,10 +328,9 @@ namespace Cocktail
 				State lst;
 				if (m_states.TryGetValue(fst.StateId, out lst))
 				{
-					foreach (var redo in redoDict[fst.StateId])
-						foreach (var patch in redo)
-							if (!lst.Merge(fst.GetSnapshot(), patch))
-								return false;
+					foreach (var patch in redoDict[fst.StateId])
+						if (!lst.Merge(fst.GetSnapshot(), patch))
+							return false;
 				}
 				newStates.Add(fst.StateId, lst ?? fst);
 			}
@@ -329,12 +362,13 @@ namespace Cocktail
 			externals = stateIds.Except(natives);
 		}
 
-        public IHierarchicalEvent Advance()
-        {
-            var event_ = BeginAdvance();
-            CommitAdvance(event_);
-            return event_;
-        }
+		// SHOULDN'T BE using it this lazy way
+		//public IHierarchicalEvent Advance()
+		//{
+		//    var event_ = BeginAdvance();
+		//    CommitAdvance(event_);
+		//    return event_;
+		//}
 
         private IHierarchicalEvent BeginAdvance()
         {
@@ -348,9 +382,9 @@ namespace Cocktail
             return newTime.Event;
         }
 
-		private void CommitAdvance(IHierarchicalEvent evt) { CommitAdvance(evt, evt); }
+		private void CommitAdvance(IHierarchicalEvent evt, RedoEntry redo) { CommitAdvance(evt, evt, redo); }
 
-        private void CommitAdvance(IHierarchicalEvent evtOriginal, IHierarchicalEvent evtFinal)
+        private void CommitAdvance(IHierarchicalEvent evtOriginal, IHierarchicalEvent evtFinal, RedoEntry redo)
         {
 			// If current time is not compatible to committing event
             if (!m_currentTime.Event.LtEq(evtFinal))
@@ -361,9 +395,12 @@ namespace Cocktail
 			//if (oldVal != event_)
 			//    throw new ApplicationException("Race condition on m_executingEvent");
 
+			//atomic{
 			Interlocked.Exchange(ref m_executingEvent, null);
-
 			m_currentTime = new ITCTimestamp(m_currentTime.ID as ITCIdentity, evtFinal as ITCEvent);
+			redo.Rev = evtFinal;
+			m_RedoList.Add(redo);
+			//}
         }
 
 		private void AbortAdvance()

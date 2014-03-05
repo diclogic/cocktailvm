@@ -32,8 +32,10 @@ namespace Cocktail
 
 	public class StatePatch
 	{
+		public enum EFlag {Delta, Create, Destroy};
 		public IHierarchicalEvent FromRev;
 		public IHierarchicalEvent ToRev;
+		public EFlag Flag = EFlag.Delta;
 		public Stream delta;
 	}
 
@@ -97,8 +99,38 @@ namespace Cocktail
 			public object oldVal;
 		}
 
-		public static void GeneratePatch(Stream ostream, State newState, State oldState)
+		public static StatePatch GeneratePatch(IHierarchicalEvent expectingEvent, StateSnapshot oldState)
 		{
+			var retval = new StatePatch();
+			retval.FromRev = oldState.Timestamp.Event;
+			retval.ToRev = expectingEvent;
+			retval.Flag = StatePatch.EFlag.Destroy;
+			return retval;
+		}
+
+		public static StatePatch GeneratePatch(StateSnapshot newState, IHierarchicalEvent originalEvent)
+		{
+			var pseudoOld = new StateSnapshot(newState.ID, newState.TypeName, HTSFactory.Make(newState.Timestamp.ID, originalEvent));
+			var retval = GeneratePatch(newState, pseudoOld);
+			retval.Flag = StatePatch.EFlag.Create;
+			return retval;
+		}
+
+		public static StatePatch GeneratePatch(StateSnapshot newState, StateSnapshot oldState)
+		{
+			var ostream = new MemoryStream();
+			GeneratePatch(ostream, newState, oldState);
+			var retval = new StatePatch();
+			retval.FromRev = oldState.Timestamp.Event;
+			retval.ToRev = newState.Timestamp.Event;
+			retval.delta = ostream;
+			return retval;
+		}
+
+		public static void GeneratePatch(Stream ostream, StateSnapshot newState, IHierarchicalEvent originalEvent)
+		{
+			var pseudoOld = new StateSnapshot(newState.ID, newState.TypeName, HTSFactory.Make(newState.Timestamp.ID, originalEvent));
+			GeneratePatch(ostream, newState, pseudoOld);
 		}
 		public static void GeneratePatch(Stream ostream, StateSnapshot newState, StateSnapshot oldState)
 		{
