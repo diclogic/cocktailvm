@@ -59,14 +59,14 @@ namespace Cocktail
 		private readonly StatePatchMethod m_patchMethod;
 
 		public TStateId StateId { get; protected set; }	//< to identify a state
-		public IHierarchicalTimestamp LatestUpdate { get; private set; }
+		public IHTimestamp LatestUpdate { get; private set; }
 
-		public State(Spacetime spaceTime, IHierarchicalTimestamp stamp)
+		public State(Spacetime spaceTime, IHTimestamp stamp)
 			: this(spaceTime, stamp, StatePatchMethod.Auto)
 		{
 		}
 
-		public State(Spacetime spaceTime, IHierarchicalTimestamp stamp, StatePatchMethod patchMethod)
+		public State(Spacetime spaceTime, IHTimestamp stamp, StatePatchMethod patchMethod)
 		{
 			StateId = new TStateId(m_seed);
 			m_spaceTime = spaceTime;
@@ -79,7 +79,7 @@ namespace Cocktail
 		//    return new State(LatestUpdate);
 		//}
 
-		public bool IsCompatible(IHierarchicalTimestamp stamp)
+		public bool IsCompatible(IHTimestamp stamp)
 		{
 			return LatestUpdate.Event.LtEq(stamp.Event);
 		}
@@ -91,10 +91,10 @@ namespace Cocktail
 
 		public bool Patch(StatePatch patch)
 		{
-			return Patch(patch.FromRev, patch.ToRev, patch.delta);
+			return Patch(patch.FromRev, patch.ToRev, patch.data);
 		}
 
-		public bool Patch(IHierarchicalEvent fromRev, IHierarchicalEvent toRev, Stream delta)
+		public bool Patch(IHEvent fromRev, IHEvent toRev, Stream delta)
 		{
 			if (toRev.LtEq(LatestUpdate.Event))
 				throw new ApplicationException("Trying to update to an older revision");
@@ -134,7 +134,7 @@ namespace Cocktail
 		{
 			if (m_patchMethod == StatePatchMethod.Auto)
 			{
-				StatePatcher.GeneratePatch(ostream, this.GetSnapshot(), oldSnapshot);
+				StatePatcher.GeneratePatch(ostream, this.GetSnapshot(), oldSnapshot, null);
 			}
 			else
 			{
@@ -142,8 +142,8 @@ namespace Cocktail
 			}
 
 		}
+
 		public virtual void DoSerialize(Stream ostream, StateSnapshot oldSnapshot) { }
-		//public abstract IEnumerable<object> Properties { get; }
 
 	}
 }

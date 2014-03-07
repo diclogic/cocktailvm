@@ -20,9 +20,26 @@ namespace Cocktail
 		None = 0,
 		CommutativeDelta = 0x1,
 		Delta = 0x2,
-		CommutitaiveReplace = 0x4,	// for mutable data
+		CommutativeReplace = 0x4,	// for mutable data
 		Replace = 0x8,
 		All = 0xFFff,
+	}
+
+	[Flags]
+	public enum StatePatchFlag : ushort
+	{
+		None = 0,
+		CreateBit = 0x1,
+		DestroyBit = 0x2,
+		CommutativeBit = 0x4,
+		ReplaceBit = 0x8,
+
+		Create = CreateBit | ReplaceBit,
+		OrderedDelta = 0,
+		CommutativeDelta = CommutativeBit,
+		OrderedReplace = ReplaceBit,
+		CommutativeReplace = ReplaceBit | CommutativeBit,
+		Destroy = DestroyBit | ReplaceBit,
 	}
 
 	public class StateFieldAttribute : Attribute
@@ -32,11 +49,10 @@ namespace Cocktail
 
 	public class StatePatch
 	{
-		public enum EFlag {Delta, Create, Destroy};
-		public IHierarchicalEvent FromRev;
-		public IHierarchicalEvent ToRev;
-		public EFlag Flag = EFlag.Delta;
-		public Stream delta;
+		public IHEvent FromRev;
+		public IHEvent ToRev;
+		public StatePatchFlag Flag = StatePatchFlag.CommutativeDelta;
+		public Stream data;
 	}
 
 	public class StateSnapshot
@@ -50,11 +66,11 @@ namespace Cocktail
 		}
 
 		public TStateId ID;
-		public IHierarchicalTimestamp Timestamp;
+		public IHTimestamp Timestamp;
 		public string TypeName;			// basically the field collection is already a mean of type, we keep the type name just for distinguish
 		public List<FieldEntry> Fields = new List<FieldEntry>();
 
-		public StateSnapshot(TStateId id, string typeName, IHierarchicalTimestamp timestamp)
+		public StateSnapshot(TStateId id, string typeName, IHTimestamp timestamp)
 		{
 			ID = id;
 			TypeName = typeName;
@@ -66,11 +82,11 @@ namespace Cocktail
 	public static class StateExtension_Snapshot
 	{
 		public static StateSnapshot GetSnapshot(this State lhs) { return GetSnapshot(lhs, lhs.LatestUpdate); }
-		public static StateSnapshot GetSnapshot(this State lhs, IHierarchicalEvent overridingEvent)
+		public static StateSnapshot GetSnapshot(this State lhs, IHEvent overridingEvent)
 		{
 			return GetSnapshot(lhs, HTSFactory.Make(lhs.LatestUpdate.ID, overridingEvent));
 		}
-		public static StateSnapshot GetSnapshot(this State lhs, IHierarchicalTimestamp overridingTS)
+		public static StateSnapshot GetSnapshot(this State lhs, IHTimestamp overridingTS)
 		{
 			var retval = new StateSnapshot(lhs.StateId, lhs.GetType().FullName, overridingTS);
 
@@ -99,40 +115,51 @@ namespace Cocktail
 			public object oldVal;
 		}
 
-		public static StatePatch GeneratePatch(IHierarchicalEvent expectingEvent, StateSnapshot oldState)
+		public static StatePatch GenerateDestroyPatch(IHEvent expectingEvent, IHEvent oriEvent)
 		{
 			var retval = new StatePatch();
-			retval.FromRev = oldState.Timestamp.Event;
+			retval.FromRev = oriEvent;
 			retval.ToRev = expectingEvent;
-			retval.Flag = StatePatch.EFlag.Destroy;
+			retval.Flag = StatePatchFlag.Destroy;
 			return retval;
 		}
 
-		public static StatePatch GeneratePatch(StateSnapshot newState, IHierarchicalEvent originalEvent)
+		public static StatePatch GenerateCreatePatch(this StateSnapshot newState, IHEvent originalEvent)
 		{
 			var pseudoOld = new StateSnapshot(newState.ID, newState.TypeName, HTSFactory.Make(newState.Timestamp.ID, originalEvent));
-			var retval = GeneratePatch(newState, pseudoOld);
-			retval.Flag = StatePatch.EFlag.Create;
+			var retval = GeneratePatch(newState, pseudoOld, FieldPatchKind.Replace);
+			retval.Flag = StatePatchFlag.Create;
 			return retval;
 		}
 
-		public static StatePatch GeneratePatch(StateSnapshot newState, StateSnapshot oldState)
+		public static StatePatch GeneratePatch(this StateSnapshot newState, StateSnapshot oldState, FieldPatchKind? forceKind)
 		{
 			var ostream = new MemoryStream();
-			GeneratePatch(ostream, newState, oldState);
+			GeneratePatch(ostream, newState, oldState, forceKind);
 			var retval = new StatePatch();
+			StatePatchFlag flag = StatePatchFlag.None;
+			foreach (var f in newState.Fields)
+			{
+				if (0 != (f.Attrib.PatchKind & (FieldPatchKind.CommutativeDelta | FieldPatchKind.CommutativeReplace)))
+					flag |= StatePatchFlag.CommutativeBit;
+
+				if (0 != (f.Attrib.PatchKind & (FieldPatchKind.Replace | FieldPatchKind.CommutativeReplace)))
+					flag |= StatePatchFlag.ReplaceBit;
+			}
+			retval.Flag = flag;
 			retval.FromRev = oldState.Timestamp.Event;
 			retval.ToRev = newState.Timestamp.Event;
-			retval.delta = ostream;
+			retval.data = ostream;
 			return retval;
 		}
 
-		public static void GeneratePatch(Stream ostream, StateSnapshot newState, IHierarchicalEvent originalEvent)
+		public static void GeneratePatch(Stream ostream, StateSnapshot newState, IHEvent originalEvent)
 		{
 			var pseudoOld = new StateSnapshot(newState.ID, newState.TypeName, HTSFactory.Make(newState.Timestamp.ID, originalEvent));
-			GeneratePatch(ostream, newState, pseudoOld);
+			GeneratePatch(ostream, newState, pseudoOld, null);
 		}
-		public static void GeneratePatch(Stream ostream, StateSnapshot newState, StateSnapshot oldState)
+
+		public static void GeneratePatch(Stream ostream, StateSnapshot newState, StateSnapshot oldState, FieldPatchKind? forceKind)
 		{
 			if (oldState.TypeName != newState.TypeName)
 				throw new ApplicationException("Mismatch between the type of new and old States");
@@ -144,8 +171,9 @@ namespace Cocktail
 				foreach (var fp in fpairs)
 				{
 					writer.Write(fp.Name);
-					writer.Write((ushort)fp.Attrib.PatchKind);
-					SerializeField(writer, fp);
+					var patchKind = forceKind.HasValue ? forceKind.Value : fp.Attrib.PatchKind;
+					writer.Write((ushort)patchKind);
+					SerializeField(writer, fp, forceKind);
 				}
 			}
 		}
@@ -156,26 +184,14 @@ namespace Cocktail
 			{
 				while (reader.PeekChar() != -1)
 				{
-					var fieldName = reader.ReadString();
-					FieldPatchKind patchKind = (FieldPatchKind)reader.ReadInt16();
-
-					var fieldInfo = state.GetType().GetField(fieldName);
-					switch (patchKind)
-					{
-						case FieldPatchKind.Delta:
-							DeserializeFieldDiff(reader, fieldInfo, state);
-							break;
-						case FieldPatchKind.Replace:
-							DeserializeField(reader, fieldInfo, state);
-							break;
-					}
+					DeserializeField(reader, state);
 				}
 			}
 		}
 
-		private static void SerializeField(BinaryWriter writer, FieldPair fpair)
+		private static void SerializeField(BinaryWriter writer, FieldPair fpair, FieldPatchKind? forceKind = null)
 		{
-			switch (fpair.Attrib.PatchKind)
+			switch (forceKind.HasValue ? forceKind.Value : fpair.Attrib.PatchKind)
 			{
 				case FieldPatchKind.CommutativeDelta:
 				case FieldPatchKind.Delta:
@@ -186,6 +202,7 @@ namespace Cocktail
 						func(writer, fpair.newVal, fpair.oldVal);
 					}
 					break;
+				case FieldPatchKind.CommutativeReplace:
 				case FieldPatchKind.Replace:
 					{
 						Action<BinaryWriter, object> func;
@@ -197,20 +214,35 @@ namespace Cocktail
 			}
 		}
 
-		private static void DeserializeField(BinaryReader reader, FieldInfo fi, object obj)
+		private static void DeserializeField(BinaryReader reader, State state)
 		{
-			Action<BinaryReader, FieldInfo, object> func;
-			if (!m_fieldDeserializers.TryGetValue(fi.FieldType, out func))
-				throw new ApplicationException(string.Format("Unsupported State Field type: {0}", fi.FieldType.FullName));
-			func(reader, fi, obj);
-		}
+			var fieldName = reader.ReadString();
+			FieldPatchKind patchKind = (FieldPatchKind)reader.ReadInt16();
 
-		private static void DeserializeFieldDiff(BinaryReader reader, FieldInfo fi, object obj)
-		{
-			Action<BinaryReader, FieldInfo, object> func;
-			if (!m_fieldDiffDeserializers.TryGetValue(fi.FieldType, out func))
-				throw new ApplicationException(string.Format("Unsupported State Field type: {0}", fi.FieldType.FullName));
-			func(reader, fi, obj);
+			var fi = state.GetType().GetField(fieldName);
+			var host = state;
+			switch (patchKind)
+			{
+				case FieldPatchKind.CommutativeDelta:
+				case FieldPatchKind.Delta:
+					{
+						Action<BinaryReader, FieldInfo, object> func;
+						if (!m_fieldDeserializers.TryGetValue(fi.FieldType, out func))
+							throw new ApplicationException(string.Format("Unsupported State Field type: {0}", fi.FieldType.FullName));
+						func(reader, fi, host);
+					}
+					break;
+				case FieldPatchKind.CommutativeReplace:
+				case FieldPatchKind.Replace:
+					{
+						Action<BinaryReader, FieldInfo, object> func;
+						if (!m_fieldDiffDeserializers.TryGetValue(fi.FieldType, out func))
+							throw new ApplicationException(string.Format("Unsupported State Field type: {0}", fi.FieldType.FullName));
+						func(reader, fi, host);
+					}
+					break;
+			}
+
 		}
 
 		private static Dictionary<Type, Action<BinaryWriter, object>> m_fieldSerializers

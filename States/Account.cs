@@ -14,7 +14,7 @@ namespace CollisionTest.States
 		[StateField(PatchKind=FieldPatchKind.Delta)]
 		public float Balance;
 
-        public Account(Spacetime spaceTime, IHierarchicalTimestamp stamp) : base(spaceTime,stamp) { }
+        public Account(Spacetime spaceTime, IHTimestamp stamp) : base(spaceTime,stamp) { }
 		public override bool Merge(StateSnapshot snapshot, StatePatch patch)
 		{
 			if (Balance != (float)snapshot.Fields.First(f=>f.Name == "Balance").Value)

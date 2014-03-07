@@ -16,7 +16,7 @@ namespace Cocktail
 		private Interpreter m_interpreter;
 		private Stream m_patchStream;
 
-		public VMState(Spacetime st, IHierarchicalTimestamp stamp)
+		public VMState(Spacetime st, IHTimestamp stamp)
 			:base(st,stamp)
 		{
 			m_interpreter = new Interpreter();

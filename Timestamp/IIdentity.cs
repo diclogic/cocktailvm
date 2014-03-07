@@ -16,37 +16,37 @@ using System.Diagnostics;
 
 namespace HTS
 {
-    public interface IHierarchicalId : IComparable
+    public interface IHId : IComparable
     {
 
     }
 
-    public interface IHierarchicalIdFactory
+    public interface IHIdFactory
     {
-        IHierarchicalId CreateFromRoot();
-		IEnumerable<IHierarchicalId> CreateFromRoot(int count);
-        IHierarchicalId CreateSiblingsOf(IHierarchicalId elderBrother);
-		IEnumerable<IHierarchicalId> CreateSiblingsOf(IHierarchicalId elderBrother, int count);
+        IHId CreateFromRoot();
+		IEnumerable<IHId> CreateFromRoot(int count);
+        IHId CreateSiblingsOf(IHId elderBrother);
+		IEnumerable<IHId> CreateSiblingsOf(IHId elderBrother, int count);
 		/// <summary>
 		/// Create/split a node into many nodes that are expected to be merged later
 		/// </summary>
-		IEnumerable<IHierarchicalId> CreateChildren(IHierarchicalId parent, int count);
+		IEnumerable<IHId> CreateChildren(IHId parent, int count);
     }
 
-    public static class HierarchicalIdService
+    public static class HIdService
     {
-        private static IHierarchicalIdFactory m_factory;
-        static HierarchicalIdService()
+        private static IHIdFactory m_factory;
+        static HIdService()
         {
             m_factory = new ITCIdentityFactory();
         }
-        public static IHierarchicalIdFactory GetFactory()
+        public static IHIdFactory GetFactory()
         {
             return m_factory;
         }
     }
 
-    internal class ITCIdentity : IHierarchicalId
+    internal class ITCIdentity : IHId
     {
         readonly itc.Identity m_impl;
         readonly ITCIdentity m_causalParent;	//< since we used sibling tree, the tree structure no longer follows the causality exactly,
@@ -129,7 +129,7 @@ namespace HTS
     /// <summary>
     /// The factory is here because i like to keep itc a library that is simple and generic.
     /// </summary>
-    class ITCIdentityFactory : IHierarchicalIdFactory
+    class ITCIdentityFactory : IHIdFactory
     {
         const uint INITIAL_SIZE = 32;
         const uint BATCH_SIZE = 16;
@@ -155,22 +155,22 @@ namespace HTS
                 throw new ApplicationException("ITCIdentityFactory being dereferenced while constructing");
         }
 
-		public IHierarchicalId CreateFromRoot()
+		public IHId CreateFromRoot()
 		{
 			return CreateChildren(m_root, 1).First();
 		}
 
-        public IEnumerable<IHierarchicalId> CreateFromRoot(int count)
+        public IEnumerable<IHId> CreateFromRoot(int count)
         {
             return CreateChildren(m_root, count);
         }
 
-		public IHierarchicalId CreateChild(IHierarchicalId parent)
+		public IHId CreateChild(IHId parent)
 		{
 			return CreateChildren(parent, 1).First();
 		}
 
-		public IEnumerable<IHierarchicalId> CreateChildren(IHierarchicalId parent, int count)
+		public IEnumerable<IHId> CreateChildren(IHId parent, int count)
 		{
 			var itcParent = parent as ITCIdentity;
 			if (itcParent == null)
@@ -206,12 +206,12 @@ namespace HTS
             }
 		}
 
-        public IHierarchicalId CreateSiblingsOf(IHierarchicalId elderBrother)
+        public IHId CreateSiblingsOf(IHId elderBrother)
         {
 			return CreateSiblingsOf(elderBrother, 1).First();
         }
 
-        public IEnumerable<IHierarchicalId> CreateSiblingsOf(IHierarchicalId elderBrother, int count)
+        public IEnumerable<IHId> CreateSiblingsOf(IHId elderBrother, int count)
         {
             ITCIdentity itcEB = elderBrother as ITCIdentity;
             if (itcEB == null)

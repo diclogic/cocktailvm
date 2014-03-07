@@ -6,31 +6,31 @@ using itc = itcsharp;
 
 namespace HTS
 {
-    public interface IHierarchicalTimestamp
+    public interface IHTimestamp
     {
-        IHierarchicalId ID { get; }
-        IHierarchicalEvent Event { get; }
-        IHierarchicalTimestamp FireEvent();
-		IHierarchicalTimestamp Join(IHierarchicalTimestamp rhs);
+        IHId ID { get; }
+        IHEvent Event { get; }
+        IHTimestamp FireEvent();
+		IHTimestamp Join(IHTimestamp rhs);
     }
 
 	public static class HTSFactory
 	{
-		public static IHierarchicalTimestamp NullValue = new ITCTimestamp(ITCIdentity.Null, ITCEvent.CreateZero());
-		public static IHierarchicalTimestamp Make(IHierarchicalId id, IHierarchicalEvent event_)
+		public static IHTimestamp NullValue = new ITCTimestamp(ITCIdentity.Null, ITCEvent.CreateZero());
+		public static IHTimestamp Make(IHId id, IHEvent event_)
 		{
 			return new ITCTimestamp(id as ITCIdentity, event_ as ITCEvent);
 		}
 	}
 
-    internal class ITCTimestamp : IHierarchicalTimestamp
+    internal class ITCTimestamp : IHTimestamp
     {
         private itc.TimeStamp m_impl;
         private ITCIdentity m_IdCache;
         private ITCEvent m_EventCache;
 
-        public IHierarchicalId ID { get { return m_IdCache; } }
-        public IHierarchicalEvent Event { get { return m_EventCache; } }
+        public IHId ID { get { return m_IdCache; } }
+        public IHEvent Event { get { return m_EventCache; } }
 
         public ITCTimestamp(ITCIdentity id, ITCEvent event_)
         {
@@ -39,13 +39,13 @@ namespace HTS
             m_impl = new itc.TimeStamp(id.GetImpl(), event_.GetImpl());
         }
 
-        public IHierarchicalTimestamp FireEvent()
+        public IHTimestamp FireEvent()
         {
             var newStamp = m_impl.FireEvent();
             return new ITCTimestamp(m_IdCache, new ITCEvent(newStamp.Event));
         }
 
-		public IHierarchicalTimestamp Join(IHierarchicalTimestamp rhs)
+		public IHTimestamp Join(IHTimestamp rhs)
 		{
 			var itcRight = rhs as ITCTimestamp;
 			if (m_IdCache.GetCausalParent() == itcRight.m_IdCache.GetCausalParent())

@@ -24,7 +24,7 @@ namespace Representation
 		Spacetime m_initialST;
 		Spacetime m_secondST;
 		List<Spacetime> m_spacetimes = new List<Spacetime>();
-		IHierarchicalIdFactory m_idFactory = HierarchicalIdService.GetFactory();
+		IHIdFactory m_idFactory = HIdService.GetFactory();
 		NamingSvcClient m_namingSvc = NamingSvcClient.Instance;
 
 		// trival

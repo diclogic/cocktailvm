@@ -10,7 +10,7 @@ namespace DOA
 
 	public class PseudoSyncMgr
 	{
-		private Dictionary<IHierarchicalId, Spacetime> m_spaceTimes = new Dictionary<IHierarchicalId, Spacetime>();
+		private Dictionary<IHId, Spacetime> m_spaceTimes = new Dictionary<IHId, Spacetime>();
 		private object m_lock = new object();
 
 		public static PseudoSyncMgr Instance = new PseudoSyncMgr();
@@ -25,7 +25,7 @@ namespace DOA
 			}
 		}
 
-		public SpacetimeSnapshot? GetSpacetime(IHierarchicalId id)
+		public SpacetimeSnapshot? GetSpacetime(IHId id)
 		{
 			lock (m_lock)
 			{
@@ -35,6 +35,12 @@ namespace DOA
 
 				return null;
 			}
+		}
+
+		public bool PullRequest(IHId idPuller, IHId idRequester)
+		{
+			// FIXME:
+			return true;
 		}
 
 	}

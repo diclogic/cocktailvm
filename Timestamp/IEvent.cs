@@ -6,12 +6,12 @@ using itc = itcsharp;
 
 namespace HTS
 {
-    public interface IHierarchicalEvent
+    public interface IHEvent
     {
-        bool LtEq(IHierarchicalEvent rhs);
+        bool LtEq(IHEvent rhs);
     }
 
-    public class ITCEvent : IHierarchicalEvent
+    public class ITCEvent : IHEvent
     {
 		private itc.Event m_impl;
 
@@ -21,7 +21,7 @@ namespace HTS
 
 		public itc.Event GetImpl() { return m_impl; }
 
-		public bool LtEq(IHierarchicalEvent rhs)
+		public bool LtEq(IHEvent rhs)
 		{
 			return itc.Event.Leq(m_impl, (rhs as ITCEvent).m_impl);
 		}

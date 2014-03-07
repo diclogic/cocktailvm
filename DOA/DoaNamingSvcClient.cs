@@ -46,7 +46,7 @@ namespace DOA
 				return null;
 			return retval.ptr;
 		}
-		public IHierarchicalId GetObjectSpaceTimeID(string objName)
+		public IHId GetObjectSpaceTimeID(string objName)
 		{
 			Entry retval;
 			if (m_objects.TryGetValue(objName, out retval))
