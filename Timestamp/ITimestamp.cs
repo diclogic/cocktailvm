@@ -21,6 +21,19 @@ namespace HTS
 		{
 			return new ITCTimestamp(id as ITCIdentity, event_ as ITCEvent);
 		}
+
+		public static IHEvent CreateZeroEvent()
+		{
+			return ITCEvent.CreateZero();
+		}
+
+		public static IComparer<IHEvent> GetEventComparer(IHId mask)
+		{
+			if (!typeof(ITCIdentity).IsAssignableFrom(mask.GetType()))
+				throw new ArgumentException("provided hid is not implemented in the same implementation family");
+
+			return new ITCEventComparer((ITCIdentity)mask);
+		}
 	}
 
     internal class ITCTimestamp : IHTimestamp
@@ -54,6 +67,11 @@ namespace HTS
 				return new ITCTimestamp(new ITCIdentity(newStamp.ID, m_IdCache.GetCausalParent()), new ITCEvent(newStamp.Event));
 			}
 			throw new ApplicationException("Not supported");
+		}
+
+		public override string ToString()
+		{
+			return m_impl.ToString();
 		}
     }
 }

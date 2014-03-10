@@ -127,7 +127,7 @@ namespace itcsharp
 
         public override string ToString()
         {
-            return "{" + m_id + " | " + m_event + "}";
+            return "{" + m_id.ToString() + " | " + m_event.ToString() + "}";
         }
 
         public object Clone()

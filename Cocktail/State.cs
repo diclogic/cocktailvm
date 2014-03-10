@@ -22,6 +22,11 @@ namespace Cocktail
 			m_val = (ulong)(uint)seed.Next() | highBits;
 		}
 
+		internal TStateId(ulong val)
+		{
+			m_val = val;
+		}
+
 		public int CompareTo(object rhs)
 		{
 			if (rhs.GetType().Equals(this))
@@ -67,8 +72,12 @@ namespace Cocktail
 		}
 
 		public State(Spacetime spaceTime, IHTimestamp stamp, StatePatchMethod patchMethod)
+			: this(new TStateId(m_seed), spaceTime, stamp, patchMethod)
 		{
-			StateId = new TStateId(m_seed);
+		}
+		public State(TStateId stateId, Spacetime spaceTime, IHTimestamp stamp, StatePatchMethod patchMethod)
+		{
+			StateId = stateId;
 			m_spaceTime = spaceTime;
 			LatestUpdate = stamp;
 			m_patchMethod = patchMethod;
@@ -84,7 +93,7 @@ namespace Cocktail
 			return LatestUpdate.Event.LtEq(stamp.Event);
 		}
 
-		public virtual bool Merge(StateSnapshot snapshot, StatePatch patch)
+		public virtual bool Merge(/*StateSnapshot snapshot,*/ StatePatch patch)
 		{
 			return Patch(patch);
 		}
@@ -130,6 +139,21 @@ namespace Cocktail
 				});
 		}
 
+		public StatePatch Serialize(StateSnapshot oldSnapshot, IHEvent expectingEvent)
+		{
+			var ostream = new MemoryStream();
+			Serialize(ostream, oldSnapshot);
+
+			var patch = new StatePatch()
+			{
+				FromRev = oldSnapshot.Timestamp.Event,
+				ToRev = expectingEvent,
+				Flag = this.GetPatchFlag(),
+				data = ostream
+			};
+			return patch;
+		}
+
 		public void Serialize(Stream ostream, StateSnapshot oldSnapshot)
 		{
 			if (m_patchMethod == StatePatchMethod.Auto)
@@ -145,6 +169,34 @@ namespace Cocktail
 
 		public virtual void DoSerialize(Stream ostream, StateSnapshot oldSnapshot) { }
 
+		public StateSnapshot GetSnapshot() { return GetSnapshot(LatestUpdate); }
+		public StateSnapshot GetSnapshot( IHEvent overridingEvent)
+		{
+			return GetSnapshot(HTSFactory.Make(LatestUpdate.ID, overridingEvent));
+		}
+		public StateSnapshot GetSnapshot( IHTimestamp overridingTS)
+		{
+
+			var retval = new StateSnapshot(StateId, GetType().FullName, overridingTS);
+
+			if (m_patchMethod == StatePatchMethod.Customized)
+			{
+				return DoSnapshot(retval);
+			}
+
+			foreach (var fi in GetFields())
+			{
+				var fval = fi.GetValue(this);
+				retval.Fields.Add(new StateSnapshot.FieldEntry() {
+					Name = fi.Name,
+					Value = fval,
+					Type = fi.FieldType,
+					Attrib = fi.GetCustomAttributes(typeof(StateFieldAttribute), false).FirstOrDefault() as StateFieldAttribute
+				});
+			}
+			return retval;
+		}
+		public virtual StateSnapshot DoSnapshot(StateSnapshot initial) { throw new NotImplementedException(); }
 	}
 }
 

@@ -5,6 +5,8 @@ using System.Text;
 using System.IO;
 using HTS;
 using System.Reflection;
+using System.Runtime.Serialization;
+using System.Runtime.Serialization.Formatters.Binary;
 
 namespace Cocktail
 {
@@ -42,6 +44,7 @@ namespace Cocktail
 		Destroy = DestroyBit | ReplaceBit,
 	}
 
+	[Serializable]
 	public class StateFieldAttribute : Attribute
 	{
 		public FieldPatchKind PatchKind;
@@ -51,8 +54,26 @@ namespace Cocktail
 	{
 		public IHEvent FromRev;
 		public IHEvent ToRev;
-		public StatePatchFlag Flag = StatePatchFlag.CommutativeDelta;
+		public StatePatchFlag Flag;
 		public Stream data;
+	}
+
+	[Serializable]
+	public struct StateCreationHeader
+	{
+		public string AssemblyQualifiedClassName;
+
+		public StateCreationHeader(Stream istream)
+		{
+			var reader = new BinaryReader(istream);
+			AssemblyQualifiedClassName = reader.ReadString();
+		}
+
+		public void Write(Stream ostream)
+		{
+			var writer = new BinaryWriter(ostream);
+			writer.Write(AssemblyQualifiedClassName);
+		}
 	}
 
 	public class StateSnapshot
@@ -79,28 +100,16 @@ namespace Cocktail
 
 	}
 
-	public static class StateExtension_Snapshot
+	public static class StatePatchingExtension
 	{
-		public static StateSnapshot GetSnapshot(this State lhs) { return GetSnapshot(lhs, lhs.LatestUpdate); }
-		public static StateSnapshot GetSnapshot(this State lhs, IHEvent overridingEvent)
-		{
-			return GetSnapshot(lhs, HTSFactory.Make(lhs.LatestUpdate.ID, overridingEvent));
-		}
-		public static StateSnapshot GetSnapshot(this State lhs, IHTimestamp overridingTS)
-		{
-			var retval = new StateSnapshot(lhs.StateId, lhs.GetType().FullName, overridingTS);
 
-			foreach (var fi in lhs.GetFields())
-			{
-				var fval = fi.GetValue(lhs);
-				retval.Fields.Add(new StateSnapshot.FieldEntry() {
-					Name = fi.Name,
-					Value = fval,
-					Type = fi.FieldType,
-					Attrib = fi.GetCustomAttributes(typeof(StateFieldAttribute), false).FirstOrDefault() as StateFieldAttribute
-				});
-			}
-			return retval;
+		public static StatePatchFlag GetPatchFlag(this State lhs)
+		{
+			if (lhs == null)
+				return StatePatchFlag.None;
+
+			var fieldPatchKinds = lhs.GetFields().Select(fi => ((StateFieldAttribute)fi.GetCustomAttributes(typeof(StateFieldAttribute), false).FirstOrDefault()).PatchKind);
+			return StatePatcher.GetPatchFlag(fieldPatchKinds);
 		}
 	}
 
@@ -127,9 +136,36 @@ namespace Cocktail
 		public static StatePatch GenerateCreatePatch(this StateSnapshot newState, IHEvent originalEvent)
 		{
 			var pseudoOld = new StateSnapshot(newState.ID, newState.TypeName, HTSFactory.Make(newState.Timestamp.ID, originalEvent));
-			var retval = GeneratePatch(newState, pseudoOld, FieldPatchKind.Replace);
+			var ostream = new MemoryStream();
+			StateCreationHeader header;
+			header.AssemblyQualifiedClassName = Assembly.CreateQualifiedName(Assembly.GetAssembly(Type.GetType(newState.TypeName)).FullName, newState.TypeName);
+			header.Write(ostream);
+			GeneratePatch(ostream, newState, pseudoOld, FieldPatchKind.Replace);
+
+			var retval = new StatePatch();
 			retval.Flag = StatePatchFlag.Create;
+			retval.FromRev = pseudoOld.Timestamp.Event;
+			retval.ToRev = newState.Timestamp.Event;
+			retval.data = ostream;
 			return retval;
+		}
+
+		public static StatePatchFlag GetPatchFlag(this StateSnapshot snapshot)
+		{
+			return GetPatchFlag(snapshot.Fields.Select(field => field.Attrib.PatchKind));
+		}
+
+		public static StatePatchFlag GetPatchFlag(IEnumerable<FieldPatchKind> fieldPatchKinds)
+		{
+			return fieldPatchKinds.Aggregate(StatePatchFlag.None,(accu, elem) =>
+				{
+				if (0 != (elem & (FieldPatchKind.CommutativeDelta | FieldPatchKind.CommutativeReplace)))
+					accu |= StatePatchFlag.CommutativeBit;
+
+				if (0 != (elem & (FieldPatchKind.Replace | FieldPatchKind.CommutativeReplace)))
+					accu |= StatePatchFlag.ReplaceBit;
+				return accu;
+				});
 		}
 
 		public static StatePatch GeneratePatch(this StateSnapshot newState, StateSnapshot oldState, FieldPatchKind? forceKind)
@@ -137,16 +173,7 @@ namespace Cocktail
 			var ostream = new MemoryStream();
 			GeneratePatch(ostream, newState, oldState, forceKind);
 			var retval = new StatePatch();
-			StatePatchFlag flag = StatePatchFlag.None;
-			foreach (var f in newState.Fields)
-			{
-				if (0 != (f.Attrib.PatchKind & (FieldPatchKind.CommutativeDelta | FieldPatchKind.CommutativeReplace)))
-					flag |= StatePatchFlag.CommutativeBit;
-
-				if (0 != (f.Attrib.PatchKind & (FieldPatchKind.Replace | FieldPatchKind.CommutativeReplace)))
-					flag |= StatePatchFlag.ReplaceBit;
-			}
-			retval.Flag = flag;
+			retval.Flag = GetPatchFlag(newState);
 			retval.FromRev = oldState.Timestamp.Event;
 			retval.ToRev = newState.Timestamp.Event;
 			retval.data = ostream;
@@ -164,29 +191,40 @@ namespace Cocktail
 			if (oldState.TypeName != newState.TypeName)
 				throw new ApplicationException("Mismatch between the type of new and old States");
 
-			using (var writer = new BinaryWriter(ostream))
+			var writer = new BinaryWriter(ostream);
+			var fpairs = from f1 in newState.Fields
+						 join f2 in oldState.Fields on f1.Name equals f2.Name
+						 select new FieldPair() { Name = f1.Name, Type = f1.Type, Attrib = f1.Attrib, newVal = f1.Value, oldVal = f2.Value };
+			foreach (var fp in fpairs)
 			{
-				var fpairs = from f1 in newState.Fields join f2 in oldState.Fields on f1.Name equals f2.Name
-							 select new FieldPair(){ Name = f1.Name, Attrib = f1.Attrib, newVal = f1.Value, oldVal = f2.Value };
-				foreach (var fp in fpairs)
-				{
-					writer.Write(fp.Name);
-					var patchKind = forceKind.HasValue ? forceKind.Value : fp.Attrib.PatchKind;
-					writer.Write((ushort)patchKind);
-					SerializeField(writer, fp, forceKind);
-				}
+				writer.Write(fp.Name);
+				var patchKind = forceKind.HasValue ? forceKind.Value : fp.Attrib.PatchKind;
+				writer.Write((ushort)patchKind);
+				SerializeField(writer, fp, forceKind);
 			}
 		}
 
 		public static void PatchState(Stream istream, State state)
 		{
-			using (var reader = new BinaryReader(istream))
-			{
+			var reader = new BinaryReader(istream);
 				while (reader.PeekChar() != -1)
 				{
 					DeserializeField(reader, state);
 				}
+		}
+
+		public static bool TryCreateFromPatch(IHId hostST, TStateId stateId, StatePatch patch, out State created)
+		{
+			if (patch.Flag != StatePatchFlag.Create)
+			{
+				created = null;
+				return false;
 			}
+
+			var header = new StateCreationHeader(patch.data);
+			var type = Type.GetType(header.AssemblyQualifiedClassName);
+			created = (State)Activator.CreateInstance(type, stateId, HTSFactory.Make(hostST, patch.ToRev));
+			return true;
 		}
 
 		private static void SerializeField(BinaryWriter writer, FieldPair fpair, FieldPatchKind? forceKind = null)

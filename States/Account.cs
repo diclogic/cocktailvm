@@ -11,16 +11,10 @@ namespace CollisionTest.States
     [State]
     public class Account : State
     {
-		[StateField(PatchKind=FieldPatchKind.Delta)]
+		[StateField(PatchKind=FieldPatchKind.CommutativeDelta)]
 		public float Balance;
 
         public Account(Spacetime spaceTime, IHTimestamp stamp) : base(spaceTime,stamp) { }
-		public override bool Merge(StateSnapshot snapshot, StatePatch patch)
-		{
-			if (Balance != (float)snapshot.Fields.First(f=>f.Name == "Balance").Value)
-				return false;
-
-			return base.Merge(snapshot, patch);
-		}
+		public Account(TStateId sid, IHTimestamp stamp) : base(sid, null, stamp, StatePatchMethod.Customized) { }
     }
 }

@@ -82,7 +82,7 @@ namespace HTS
                 var midresult = new List<itc.Identity>();
                 foreach (var id in remains)
                 {
-                    var pair = m_impl.Fork();
+                    var pair = id.Fork();
                     midresult.Add(pair.First);
                     midresult.Add(pair.Second);
                 }
@@ -124,6 +124,11 @@ namespace HTS
         {
             return m_impl.Equals((rhs as ITCIdentity).m_impl);
         }
+
+		public override string ToString()
+		{
+			return m_impl.ToString();
+		}
     }
 
     /// <summary>

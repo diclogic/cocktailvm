@@ -14,6 +14,8 @@ namespace DOA
 		private object m_lock = new object();
 
 		public static PseudoSyncMgr Instance = new PseudoSyncMgr();
+		private Spacetime m_vmST;
+		private TStateId m_vmStateId;
 
 		private PseudoSyncMgr() { }
 
@@ -37,11 +39,25 @@ namespace DOA
 			}
 		}
 
-		public bool PullRequest(IHId idPuller, IHId idRequester)
+		internal bool PrePullRequest(IHId idPuller, IHId idRequester, IHEvent evtOriginal, IEnumerable<TStateId> affectedStates)
 		{
-			// FIXME:
-			return true;
+			return m_spaceTimes[idPuller].PrePullRequest(idRequester, evtOriginal, affectedStates);
 		}
 
+		public bool SyncPullRequest(IHId idPuller, IHId idRequester, IHEvent foreignExpectedEvent, ILookup<TStateId, StatePatch> affectedStates)
+		{
+			return m_spaceTimes[idPuller].SyncPullRequest(idRequester, foreignExpectedEvent, affectedStates);
+		}
+
+		public void Initialize(VMSpacetime vmST)
+		{
+			m_vmST = vmST;
+			m_vmStateId = vmST.VMStateId;
+		}
+
+		public void PullFromVmSt(IHId spacetimeId)
+		{
+			m_spaceTimes[spacetimeId].PullFromVmSt(m_vmST.Snapshot(), m_vmStateId);
+		}
 	}
 }

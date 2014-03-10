@@ -21,6 +21,7 @@ namespace Representation
 		AABB m_worldBox;
 		double m_accumulate = 0;
 		Random m_rand = new Random();
+		VMSpacetime m_vmST;
 		Spacetime m_initialST;
 		Spacetime m_secondST;
 		List<Spacetime> m_spacetimes = new List<Spacetime>();
@@ -35,12 +36,24 @@ namespace Representation
 		{
 			m_worldBox = worldBox;
 
+			m_vmST = new VMSpacetime(m_idFactory);
+			// declare a function form for an event, which also means binding an event to one or a few state types
+			m_vmST.VMExecute("Cocktail.DeclareAndLink", "Initiate", typeof(Accounting).GetMethod("Initiate"));
+			m_vmST.VMExecute("Cocktail.DeclareAndLink", "Transfer", typeof(Accounting).GetMethod("Transfer"));
+			m_vmST.VMExecute("Cocktail.DeclareAndLink", "Deduct", typeof(Accounting).GetMethod("Deduct"));
+			//kernel.Declare("CreateAccount", FunctionForm.From(typeof(Accounting).GetMethod("CreateAccount")));
+			PseudoSyncMgr.Instance.Initialize(m_vmST);
+
+
 			m_initialST = new Spacetime(m_idFactory.CreateFromRoot(), ITCEvent.CreateZero(), m_idFactory);
 			m_secondST = new Spacetime(m_idFactory.CreateFromRoot(), ITCEvent.CreateZero(), m_idFactory);
 			m_spacetimes.Add(m_initialST);
 			m_spacetimes.Add(m_secondST);
 			PseudoSyncMgr.Instance.RegisterSpaceTime(m_initialST);
 			PseudoSyncMgr.Instance.RegisterSpaceTime(m_secondST);
+			PseudoSyncMgr.Instance.PullFromVmSt(m_initialST.ID);
+			PseudoSyncMgr.Instance.PullFromVmSt(m_secondST.ID);
+
 
 			var newAccount = m_initialST.CreateState((st, stamp) => new Account(st, stamp));
 			m_namingSvc.RegisterObject(newAccount.StateId.ToString(), newAccount.GetType().ToString(), newAccount);
@@ -51,11 +64,6 @@ namespace Representation
 			m_accounts.Add(newAccount as Account);
 
 			{
-				// declare a function form for an event, which also means binding an event to one or a few state types
-				m_initialST.VMExecute("Cocktail.DeclareAndLink", "Initiate", typeof(Accounting).GetMethod("Initiate"));
-				m_initialST.VMExecute("Cocktail.DeclareAndLink", "Transfer", typeof(Accounting).GetMethod("Transfer"));
-				m_initialST.VMExecute("Cocktail.DeclareAndLink", "Deduct", typeof(Accounting).GetMethod("Deduct"));
-				//kernel.Declare("CreateAccount", FunctionForm.From(typeof(Accounting).GetMethod("CreateAccount")));
 			}
 
 

@@ -27,19 +27,19 @@ namespace CollisionTest
     }
 
 	// TODO: CLEAN UP: we don't need wrapper anymore, a state should be sync'd as a whole to allow Repeatable-Read
-	public static class AccountingWrapper
-	{
-		public static void Initiate([State] StateRef account, float amount)
-		{
-			account.SetField("Balance", amount);
-		}
+	//public static class AccountingWrapper
+	//{
+	//    public static void Initiate([State] StateRef account, float amount)
+	//    {
+	//        account.SetField("Balance", amount);
+	//    }
 
-        public static void Transfer([State] StateRef fromAcc,[State] StateRef toAcc, float amount)
-        {
-			var fFrom = fromAcc.GetField<float>("Balance");
-			fromAcc.SetField("Balance", fFrom - amount);
-			var fTo = toAcc.GetField<float>("Balance");
-			toAcc.SetField("Balance", fTo + amount);
-        }
-	}
+	//    public static void Transfer([State] StateRef fromAcc,[State] StateRef toAcc, float amount)
+	//    {
+	//        var fFrom = fromAcc.GetField<float>("Balance");
+	//        fromAcc.SetField("Balance", fFrom - amount);
+	//        var fTo = toAcc.GetField<float>("Balance");
+	//        toAcc.SetField("Balance", fTo + amount);
+	//    }
+	//}
 }

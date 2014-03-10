@@ -80,7 +80,7 @@ namespace itcsharp
         {
             if (IsSimplex())
                 return N.ToString();
-            return "(" + N + ": " + Left + ", " + Right + ")";
+            return N + "+(" + Left + ", " + Right + ")";
         }
 
         public bool IsSimplex()

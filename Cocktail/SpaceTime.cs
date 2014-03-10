@@ -51,19 +51,29 @@ namespace Cocktail
 		private class RedoEntry
 		{
 			public IHEvent Rev;
-			public List<IHId> AffectedFSTs = new List<IHId>();
-			public Dictionary<TStateId, StatePatch> LocalChanges = new Dictionary<TStateId, StatePatch>();
+			public IEnumerable<IHId> AffectedFSTs;
+			public IDictionary<TStateId, StatePatch> LocalChanges;
+
+			RedoEntry Filter(IEnumerable<IHId> STs, IDictionary<TStateId,IHId> dict)
+			{
+				var retval = new RedoEntry();
+				retval.Rev = this.Rev;
+				retval.AffectedFSTs = this.AffectedFSTs.Where(val => STs.Contains(val));
+				retval.LocalChanges = this.LocalChanges.Where(kv => STs.Contains(dict[kv.Key])).ToDictionary(kv => kv.Key, kv => kv.Value);
+				return retval;
+			}
 		}
 
         private IHIdFactory m_idFactory;
         private IHTimestamp m_currentTime;
-		private Dictionary<TStateId, State> m_states;
-		private Dictionary<TStateId, State> m_nativeStates;
+		protected Dictionary<TStateId, State> m_states;
+		protected Dictionary<TStateId, State> m_nativeStates;
 		private List<RedoEntry> m_RedoList = new List<RedoEntry>();
 		private object m_executionLock = new object();
 		private SortedList<IHEvent, ExecutionFraction> m_incomingExecutions = new SortedList<IHEvent, ExecutionFraction>();
 		private IHEvent m_executingEvent;
-		private VMState m_vm;
+		private bool m_isWaitingForPullRequest = false;
+		protected VMState m_vm;
 		// we use cached state to "pro-act" on an event involves external states optimistically, and let the external ST denies it.
 		private Dictionary<IHId, ExternalSTEntry> m_cachedExternalST = new Dictionary<IHId, ExternalSTEntry>();
 
@@ -90,8 +100,10 @@ namespace Cocktail
 			m_idFactory = idFactory;
 			m_states = initialStates.ToDictionary((s) => s.StateId);
 			m_nativeStates = initialStates.ToDictionary((s) => s.StateId);
-			m_vm = (VMState)CreateState((st,_stamp) => new VMState(st,_stamp));
 
+			// every ST must have the minimal VM since the very beginning, VM's life time has no beginning nor an end
+			m_vm = new VMState(this, stamp);
+			m_states.Add(m_vm.StateId, m_vm);
 		}
 
 		public State CreateState(Func<Spacetime, IHTimestamp, State> constructor)
@@ -102,6 +114,7 @@ namespace Cocktail
 			m_nativeStates.Add(newState.StateId, newState);
 
 			var redo = new RedoEntry();
+			redo.LocalChanges = new Dictionary<TStateId, StatePatch>();
 
 			var patch = newState.GetSnapshot(event_).GenerateCreatePatch(m_currentTime.Event);
 			redo.LocalChanges.Add(newState.StateId, patch);
@@ -233,10 +246,13 @@ namespace Cocktail
 
 		public void Execute(string funcName, IEnumerable<KeyValuePair<string, StateRef>> stateParams, params object[] constArgs)
 		{
-			ExecuteArgs(funcName, stateParams, constArgs);
+			lock (m_executionLock)
+			{
+				ExecuteArgs(funcName, stateParams, constArgs);
+			}
 		}
 
-		public bool ExecuteArgs(string funcName, IEnumerable<KeyValuePair<string,StateRef>> stateParams, IEnumerable<object> constArgs)
+		protected bool ExecuteArgs(string funcName, IEnumerable<KeyValuePair<string,StateRef>> stateParams, IEnumerable<object> constArgs)
 		{
 			IHEvent evtOriginal,evtFinal;
 			while ((evtOriginal = BeginAdvance()) == null) ;
@@ -246,21 +262,38 @@ namespace Cocktail
 			IEnumerable<TStateId> nativeIds, foreignIds;
 			SplitStateParams(stateParams.Select((sp) => sp.Value.StateId), out nativeIds, out foreignIds);
 
-			var foreignSTs = new List<KeyValuePair<IHId,TStateId>>();
+			var foreignStates = new List<KeyValuePair<IHId,TStateId>>();
+			var foreignSTIds = Enumerable.Empty<IHId>();
+			var pullSTs = Enumerable.Empty<IGrouping<IHId, TStateId>>();
 			if (foreignIds.Count() > 0)
 			{
 				// Fetch it from somewhere
 				foreach (var sid in foreignIds)
 				{
 					var hid = NamingSvcClient.Instance.GetObjectSpaceTimeID(sid.ToString());
-					foreignSTs.Add(new KeyValuePair<IHId,TStateId>(hid,sid));
+					foreignStates.Add(new KeyValuePair<IHId,TStateId>(hid,sid));
 				}
+				foreignSTIds = foreignStates.Select(kv=>kv.Key).Distinct();
+
+				var foreignSTs = foreignSTIds.Select(id => PseudoSyncMgr.Instance.GetSpacetime(id))
+											.Where(val=>val.HasValue)
+											.ToDictionary(val=>val.Value.Timestamp.ID, val=>val.Value);
+
+				pullSTs = foreignStates.Where(sp =>
+					{
+						var state = foreignSTs[sp.Key].States.FirstOrDefault(s => s.StateId.Equals(sp.Value));
+						return state != null && (0 == (state.GetPatchFlag() & StatePatchFlag.CommutativeBit));
+					}).GroupBy(kv => kv.Key, kv => kv.Value);
+
+				// because we know who is involved, we can give headsup to them beforehand
+				foreach (var st in pullSTs)
+					if (!PseudoSyncMgr.Instance.PrePullRequest(st.Key, this.ID, evtOriginal, st))
+						throw new ApplicationException("Failed to lock foreign ST");
 
 				IHTimestamp failingST = null;
-				foreach (var hid in foreignSTs.ToLookup(kv=>kv.Key))
+				foreach (var st in foreignSTs)
 				{
-					var st = PseudoSyncMgr.Instance.GetSpacetime(hid);
-					if (!MergeSpacetime(st.Value.Timestamp, st.Value.States, st.Value.Redos, ref evtFinal))
+					if (!MergeSpacetime(st.Value.Timestamp, st.Value.Redos, ref evtFinal))
 					{
 						failingST = st.Value.Timestamp;
 						break;
@@ -289,86 +322,79 @@ namespace Cocktail
 			//----- make redo -------
 
 			var redo = new RedoEntry();
-			redo.AffectedFSTs = foreignSTs.ToList();
+			redo.AffectedFSTs = foreignSTIds.ToList();
 			redo.LocalChanges = new Dictionary<TStateId, StatePatch>();
 
 			foreach (var spair in
 						from s1 in states join s2 in oldSnapshots on s1.StateId equals s2.ID 
 						select new SnapshotPair(s1,s2))
 			{
-				var ostream = new MemoryStream();
-				spair.First.Serialize(ostream, spair.Second);
-				var patch = new StatePatch()
-				{
-					FromRev = spair.Second.Timestamp.Event,
-					ToRev = evtFinal,
-					data = ostream
-				};
+				var patch = spair.First.Serialize(spair.Second, evtFinal);
 				redo.LocalChanges.Add(spair.First.StateId, patch);
 			}
 
 			//--------- get approve from foreign STs ---------
-
-			// TODO: because we know who is involved, we can give headsup to them beforehand
-
 			// Send "pull request" to spacetimes whose non-commutative sates we changed
-
-			var syncFST = new HashSet<IHId>();
-			foreach (var state in redo.LocalChanges)
+			bool bApproved = true;
+			var pulledSTIds = new List<IHId>();
+			foreach (var fst in pullSTs)
 			{
-				if (0 != (state.Value.Flag & StatePatchFlag.CommutativeBit))
-					continue;
-				syncFST.Add(foreignIdToSTMap[state.Key]);
-			}
-			foreach (var fst in syncFST)
-			{
-				var bOK = PseudoSyncMgr.Instance.PullRequest(fst, this.ID, redo.LocalChanges[]);
+				bApproved &= PseudoSyncMgr.Instance.SyncPullRequest(fst.Key, this.ID, evtFinal, redo.LocalChanges.Where(kv => fst.Contains(kv.Key)).ToLookup(kv => kv.Key, kv => kv.Value));
+				pulledSTIds.Add(fst.Key);
 			}
 
+			if (!bApproved)
+			{
+				//foreach (var stId in pulledSTIds)
+				//    PseudoSyncMgr.Instance.RollbackPullRequest(stId);
+				return false;
+			}
+
+			// ---------- commit to local ST ------------
 			CommitAdvance(evtOriginal, evtFinal, redo);
 
-			// Push native changes to other spacetimes that are aware of us
-			//PseudoSyncMgr.Instance.
+			// Push native changes to spacetimes that are highly depend on us
 
 			return true;
 		}
 
-		private bool MergeSpacetime(IHTimestamp foreignStamp, IEnumerable<State> foreignStates, ILookup<TStateId, StatePatch> redos, ref IHEvent expectingEvent)
+
+		private bool MergeSpacetime(IHTimestamp foreignStamp, ILookup<TStateId, StatePatch> redos, ref IHEvent expectingEvent)
 		{
 			var redoDict = redos;
 			// all states are put into m_states
 			var newStates = new Dictionary<TStateId, State>();
-			foreach (var fst in foreignStates)
+			foreach (var fst in redos)
 			{
+				var fstateId = fst.Key;
+				var patches = fst.OrderBy(patch => patch.FromRev, HTSFactory.GetEventComparer(foreignStamp.ID));
+
+				foreach (var p in patches)
+					p.data.Seek(0, SeekOrigin.Begin);
+
 				State lst;
-				if (m_states.TryGetValue(fst.StateId, out lst))
+				if (!m_states.TryGetValue(fstateId, out lst))
 				{
-					foreach (var patch in redoDict[fst.StateId])
-						if (!lst.Merge(fst.GetSnapshot(), patch))
-							return false;
+
+					if (!StatePatcher.TryCreateFromPatch(foreignStamp.ID, fstateId, patches.First(), out lst))
+						return false;
 				}
-				newStates.Add(fst.StateId, lst ?? fst);
+
+				foreach (var patch in patches)
+					if (!lst.Merge(patch))
+						return false;
+
+				newStates.Add(fstateId, lst);
 			}
 
 			ExternalSTEntry entry;
 			entry.LatestUpateTime = foreignStamp;
 			entry.States = newStates;
-			m_cachedExternalST.Add(foreignStamp.ID, entry);
+			m_cachedExternalST[foreignStamp.ID] = entry;
 
 			var localTime = HTSFactory.Make(ID, expectingEvent);
 			expectingEvent = localTime.Join(foreignStamp).Event;
 			return true;
-		}
-
-		public void VMExecute(string funcName, params object[] constArgs)
-		{
-			VMExecuteArgs(funcName, constArgs);
-		}
-		public void VMExecuteArgs(string funcName, IEnumerable<object> constArgs)
-		{
-			ExecuteArgs(funcName
-				, Enumerable.Repeat(new KeyValuePair<string, StateRef>("VM", new LocalStateRef<VMState>(m_vm)), 1)
-				, constArgs);
 		}
 
 		private void SplitStateParams(IEnumerable<TStateId> stateIds, out IEnumerable<TStateId> natives, out IEnumerable<TStateId> externals)
@@ -431,5 +457,60 @@ namespace Cocktail
 		}
 
 		#endregion
+
+		internal bool PrePullRequest(IHId idRequester, IHEvent evtOriginal, IEnumerable<TStateId> affectedStates)
+		{
+			// Currently we lock whole ST
+			if (m_isWaitingForPullRequest)
+				throw new ApplicationException("PullRequest lock already locked");
+			lock (m_executionLock)
+			{
+				m_isWaitingForPullRequest = true;
+			}
+			if (m_currentTime.Event.LtEq(evtOriginal))
+				return true;
+			return false;
+		}
+
+		internal bool SyncPullRequest(IHId idRequester, IHEvent foreignExpectedEvent, ILookup<TStateId,StatePatch> redos)
+		{
+			var evtOriginal = BeginAdvance();
+			var evtFinal = evtOriginal;
+
+			var redo = new RedoEntry();
+			redo.LocalChanges = new Dictionary<TStateId, StatePatch>();
+
+			bool bOK = MergeSpacetime(HTSFactory.Make(idRequester, foreignExpectedEvent), redos, ref evtFinal);
+			if (!bOK)
+				return false;
+
+			m_isWaitingForPullRequest = false;
+			CommitAdvance(evtOriginal, evtFinal, redo);
+			return true;
+		}
+
+		internal void PullFromVmSt(SpacetimeSnapshot vmST, TStateId vmStateId)
+		{
+			var cmp = HTSFactory.GetEventComparer(vmST.Timestamp.ID);
+
+			var evtOri = BeginAdvance();
+			var evtFinal = evtOri;
+
+			var newRedos = vmST.Redos[vmStateId].OrderBy(patch=> patch.ToRev, HTSFactory.GetEventComparer(vmST.Timestamp.ID))
+								.SkipWhile(patch => cmp.Compare(m_currentTime.Event, patch.FromRev) > 0)
+								.ToLookup(_ => vmStateId);
+			var localRedo = new RedoEntry();
+			localRedo.LocalChanges = new Dictionary<TStateId, StatePatch>();
+
+			if (!MergeSpacetime(vmST.Timestamp, newRedos, ref evtFinal))
+				throw new ApplicationException("Failed to pull from VM Spacetime");
+
+			State vmState;
+			if (!m_states.TryGetValue(vmStateId, out vmState))
+				throw new ApplicationException("VM Spacetime don't contain the VMState");
+
+			m_vm = (VMState)vmState;
+			CommitAdvance(evtOri, evtFinal, localRedo);
+		}
 	}
 }
