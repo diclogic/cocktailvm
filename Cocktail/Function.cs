@@ -84,8 +84,9 @@ namespace Cocktail
 			bool bStateRemain, bConstRemain;
 			var stateEnumerator = stateArgs.GetEnumerator();
 			var constEnumerator = constArgs.GetEnumerator();
+			var constTypeEnumeerator = m_paramTypes.GetEnumerator();
 			bStateRemain = stateEnumerator.MoveNext();
-			bConstRemain = constEnumerator.MoveNext();
+			bConstRemain = constTypeEnumeerator.MoveNext() && constEnumerator.MoveNext();
 
 			int idx = 0;
 			do
@@ -97,8 +98,13 @@ namespace Cocktail
 				}
 				else if (bConstRemain)
 				{
-					yield return constEnumerator.Current;
-					bConstRemain = constEnumerator.MoveNext();
+					var curVal = constEnumerator.Current;
+					var curType = constTypeEnumeerator.Current;
+					if (curType.IsAssignableFrom(curVal.GetType()))
+						yield return curVal;
+					else
+						yield return Convert.ChangeType(curVal, curType);
+					bConstRemain = constTypeEnumeerator.MoveNext() && constEnumerator.MoveNext();
 				}
 				++idx;
 			}

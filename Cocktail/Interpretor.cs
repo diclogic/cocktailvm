@@ -193,8 +193,11 @@ namespace Cocktail
 		}
 		public void Call(string eventName, IEnumerable<KeyValuePair<string, StateRef>> states, IEnumerable<object> constArgs)
 		{
+			if (states.Any(kv => kv.Value == null))
+				throw new RuntimeException("state argument can't be null");
+
 			var stateParams = GenStateParams(states);
-			var constTypes = constArgs.Select<object,Type>((o)=>o.GetType());
+			var constTypes = constArgs.Select((o) => o == null ? typeof(object) : o.GetType());
             var sign = Find(eventName , stateParams , constTypes );
 
 			if (sign == null)

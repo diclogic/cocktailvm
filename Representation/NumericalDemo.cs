@@ -38,9 +38,9 @@ namespace Representation
 
 			m_vmST = new VMSpacetime(m_idFactory);
 			// declare a function form for an event, which also means binding an event to one or a few state types
-			m_vmST.VMExecute("Cocktail.DeclareAndLink", "Initiate", typeof(Accounting).GetMethod("Initiate"));
+			m_vmST.VMExecute("Cocktail.DeclareAndLink", "Deposit", typeof(Accounting).GetMethod("Deposit"));
 			m_vmST.VMExecute("Cocktail.DeclareAndLink", "Transfer", typeof(Accounting).GetMethod("Transfer"));
-			m_vmST.VMExecute("Cocktail.DeclareAndLink", "Deduct", typeof(Accounting).GetMethod("Deduct"));
+			m_vmST.VMExecute("Cocktail.DeclareAndLink", "Withdraw", typeof(Accounting).GetMethod("Withdraw"));
 			//kernel.Declare("CreateAccount", FunctionForm.From(typeof(Accounting).GetMethod("CreateAccount")));
 			PseudoSyncMgr.Instance.Initialize(m_vmST);
 
@@ -78,8 +78,10 @@ namespace Representation
 
 			foreach (var acc in m_accounts)
 			{
-				m_initialST.Execute("Initiate", Utils.MakeArgList("account", new RemoteStateRef(acc.StateId,acc.GetType().ToString())), (float)900);
+				m_initialST.Execute("Deposit", Utils.MakeArgList("account", new RemoteStateRef(acc.StateId,acc.GetType().ToString())), (float)900);
 			}
+
+			MakeCollision();
 		}
 
 		RemoteStateRef GenRemoteRef(State state) { return new RemoteStateRef(state.StateId, state.GetType().ToString()); }
@@ -97,7 +99,7 @@ namespace Representation
 
 		private void MakeCollision()
 		{
-			m_initialST.Execute("Deduct"
+			m_initialST.Execute("Withdraw"
 				,Utils.MakeArgList("account", new LocalStateRef<Account>(m_accounts[0]))
 				, 5.0);
 

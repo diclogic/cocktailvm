@@ -9,9 +9,9 @@ namespace CollisionTest
 {
     public static class Accounting
     {
-		public static void Initiate([State] Account account, float amount)
+		public static void Deposit([State] Account account, float amount)
 		{
-			account.Balance = amount;
+			account.Balance += amount;
 		}
 
         public static void Transfer([State] Account fromAcc, [State] Account toAcc, float amount)
@@ -20,7 +20,7 @@ namespace CollisionTest
             toAcc.Balance += amount;
         }
 
-		public static void Deduct([State] Account account, float amount)
+		public static void Withdraw([State] Account account, float amount)
 		{
 			account.Balance -= amount;
 		}

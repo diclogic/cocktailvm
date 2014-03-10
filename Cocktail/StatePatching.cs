@@ -223,7 +223,8 @@ namespace Cocktail
 
 			var header = new StateCreationHeader(patch.data);
 			var type = Type.GetType(header.AssemblyQualifiedClassName);
-			created = (State)Activator.CreateInstance(type, stateId, HTSFactory.Make(hostST, patch.ToRev));
+			// newly created state must start from "FromRev"
+			created = (State)Activator.CreateInstance(type, stateId, HTSFactory.Make(hostST, patch.FromRev));
 			return true;
 		}
 

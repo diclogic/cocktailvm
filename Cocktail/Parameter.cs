@@ -36,7 +36,11 @@ namespace Cocktail
 	{
 		public bool Equals(Type x, Type y)
 		{
-			return x.IsAssignableFrom(y);
+			if (x.IsAssignableFrom(y))
+				return true;
+			if (x.IsPrimitive && y.IsPrimitive)
+				return true;
+			return false;
 		}
 
 		public int GetHashCode(Type obj)
