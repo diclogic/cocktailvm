@@ -113,10 +113,6 @@ namespace Cocktail
 
 		private static KeyValuePair<object, int> ConvertCocktailToCSharp(StateParamInst spi)
 		{
-			// no need to convert if already warpped
-			if (spi.type == "Cocktail.StateRef")
-				return new KeyValuePair<object, int>(spi.arg, spi.index);
-
 			var stateType = spi.arg.GetType();
 			if (stateType.IsGenericType && stateType.GetGenericTypeDefinition() == typeof(LocalStateRef<>))
 			{
