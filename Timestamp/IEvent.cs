@@ -21,6 +21,7 @@ namespace HTS
 
 		public int Compare(IHEvent x, IHEvent y)
 		{
+			//TODO: use mask
 			if (!x.LtEq(y))
 				return 1;
 			if (!y.LtEq(x))

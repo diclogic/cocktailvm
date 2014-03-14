@@ -39,7 +39,7 @@ namespace DOA
 			}
 		}
 
-		internal bool PrePullRequest(IHId idPuller, IHId idRequester, IHEvent evtOriginal, IEnumerable<TStateId> affectedStates)
+		internal PrePullResult PrePullRequest(IHId idPuller, IHId idRequester, IHEvent evtOriginal, IEnumerable<TStateId> affectedStates)
 		{
 			return m_spaceTimes[idPuller].PrePullRequest(idRequester, evtOriginal, affectedStates);
 		}

@@ -30,7 +30,6 @@ namespace Representation
 
 		// trival
 		double m_elapsed;
-		bool m_pushFlag = true;
 
 		public void Init(AABB worldBox)
 		{
@@ -80,20 +79,28 @@ namespace Representation
 			{
 				m_initialST.Execute("Deposit", Utils.MakeArgList("account", new RemoteStateRef(acc.StateId,acc.GetType().ToString())), (float)900);
 			}
+			SyncSpacetimes();
 
-			MakeCollision();
+			//MakeCollision();
 		}
 
 		RemoteStateRef GenRemoteRef(State state) { return new RemoteStateRef(state.StateId, state.GetType().ToString()); }
 
+		void SyncSpacetimes()
+		{
+			m_spacetimes[1].PullAllFrom(m_spacetimes[0].Snapshot());
+			m_spacetimes[0].PullAllFrom(m_spacetimes[1].Snapshot());
+		}
+
 		void UpdateWorld(float interval)
 		{
-			if (m_elapsed > 0 && m_pushFlag)
+			if (m_elapsed > 0.5)
 			{
 				m_initialST.Execute("Transfer"
 					, Utils.MakeArgList( "fromAcc", new LocalStateRef<Account>(m_accounts[0])
 						, "toAcc", GenRemoteRef(m_accounts[1]))
 					, (float)m_rand.Next(50));
+				SyncSpacetimes();
 			}
 		}
 
@@ -106,6 +113,8 @@ namespace Representation
 			m_secondST.Execute("Transfer"
 				, Utils.MakeArgList("fromAcc", GenRemoteRef(m_accounts[0]), "toAcc", GenRemoteRef(m_accounts[1]))
 				, 7.0);
+
+			SyncSpacetimes();
 		}
 
 		public void Update(IRenderer renderer, double dt)
@@ -124,16 +133,16 @@ namespace Representation
 
 		public class Present : BasePresenter
 		{
-			Account[] m_accounts;
+			StateSnapshot[] m_accounts;
 			readonly AABB m_worldbox;
 			public Present(List<Account> pts, AABB worldBox)
 			{
-				m_accounts = pts.ToArray();
+				m_accounts = pts.Select(e => e.GetSnapshot()).ToArray();
 				m_worldbox = worldBox;
 			}
 			public override void Render()
 			{
-				const float MAX_AMOUNT = 1000;
+				const float MAX_AMOUNT = 10000;
 				var count = m_accounts.Length;
 				var worldWidth = m_worldbox.Max.X - m_worldbox.Min.X;
 				var worldHeight = m_worldbox.Max.Y - m_worldbox.Min.Y;
@@ -144,12 +153,23 @@ namespace Representation
 				foreach (var p in m_accounts)
 				{
 					GL.Color4(Color4.DarkRed);
-					GL.Vertex2(stepWidth * index, m_worldbox.Min.Y);
-					GL.Vertex2(stepWidth * index, worldHeight);
-					GL.Vertex2(stepWidth * index + (stepWidth / 2), worldHeight * p.Balance / MAX_AMOUNT);
+					DrawQuadByTriangles(stepWidth * index + m_worldbox.Min.X, m_worldbox.Min.Y
+										, stepWidth * index + (stepWidth / 2.0f)
+										, worldHeight * (float)p.Fields.Find(f=>f.Name == "Balance").Value / MAX_AMOUNT);
 					++index;
 				}
 				GL.End();
+			}
+
+			private void DrawQuadByTriangles(float minX, float minY, float width, float height)
+			{
+				GL.Vertex2(minX, minY);
+				GL.Vertex2(minX + width, minY);
+				GL.Vertex2(minX, minY + height);
+
+				GL.Vertex2(minX, minY + height);
+				GL.Vertex2(minX + width, minY);
+				GL.Vertex2(minX + width, minY + height);
 			}
 		}
 		public IPresenter GetPresent()

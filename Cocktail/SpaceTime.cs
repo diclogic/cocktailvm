@@ -39,6 +39,13 @@ namespace Cocktail
 		public ILookup<TStateId, StatePatch> Redos;
 	}
 
+	public enum PrePullResult
+	{
+		Failed,
+		Succeeded,
+		NoLocking,
+	}
+
     /// <summary>
     /// the SpaceTime represents the development of objects
     /// it is a thread apartment that can include one to many objects
@@ -282,12 +289,14 @@ namespace Cocktail
 				pullSTs = foreignStates.Where(sp =>
 					{
 						var state = foreignSTs[sp.Key].States.FirstOrDefault(s => s.StateId.Equals(sp.Value));
-						return state != null && (0 == (state.GetPatchFlag() & StatePatchFlag.CommutativeBit));
+						if (state == null)
+							throw new ApplicationException("No such state in foreign Spacetime and creating state into external ST is not allowed");
+						return (0 == (state.GetPatchFlag() & StatePatchFlag.CommutativeBit));
 					}).GroupBy(kv => kv.Key, kv => kv.Value);
 
 				// because we know who is involved, we can give headsup to them beforehand
 				foreach (var st in pullSTs)
-					if (!PseudoSyncMgr.Instance.PrePullRequest(st.Key, this.ID, evtOriginal, st))
+					if (PrePullResult.Failed == PseudoSyncMgr.Instance.PrePullRequest(st.Key, this.ID, evtOriginal, st))
 						throw new ApplicationException("Failed to lock foreign ST");
 
 				IHTimestamp failingST = null;
@@ -361,7 +370,6 @@ namespace Cocktail
 
 		private bool MergeSpacetime(IHTimestamp foreignStamp, ILookup<TStateId, StatePatch> redos, ref IHEvent expectingEvent)
 		{
-			var redoDict = redos;
 			// all states are put into m_states
 			var newStates = new Dictionary<TStateId, State>();
 			foreach (var fst in redos)
@@ -458,18 +466,26 @@ namespace Cocktail
 
 		#endregion
 
-		internal bool PrePullRequest(IHId idRequester, IHEvent evtOriginal, IEnumerable<TStateId> affectedStates)
+		internal PrePullResult PrePullRequest(IHId idRequester, IHEvent evtOriginal, IEnumerable<TStateId> affectedStates)
 		{
+			if (affectedStates.FirstOrDefault().Equals(default(TStateId)))
+				return PrePullResult.NoLocking;
+
 			// Currently we lock whole ST
 			if (m_isWaitingForPullRequest)
 				throw new ApplicationException("PullRequest lock already locked");
+
 			lock (m_executionLock)
 			{
 				m_isWaitingForPullRequest = true;
 			}
+
 			if (m_currentTime.Event.LtEq(evtOriginal))
-				return true;
-			return false;
+			{
+				return PrePullResult.Succeeded;
+			}
+
+			return PrePullResult.Failed;
 		}
 
 		internal bool SyncPullRequest(IHId idRequester, IHEvent foreignExpectedEvent, ILookup<TStateId,StatePatch> redos)
@@ -510,6 +526,26 @@ namespace Cocktail
 				throw new ApplicationException("VM Spacetime don't contain the VMState");
 
 			m_vm = (VMState)vmState;
+			CommitAdvance(evtOri, evtFinal, localRedo);
+		}
+
+		public void PullAllFrom(SpacetimeSnapshot foreignST)
+		{
+			var cmp = HTSFactory.GetEventComparer(foreignST.Timestamp.ID);
+
+			var evtOri = BeginAdvance();
+			var evtFinal = evtOri;
+
+			var flatPairs = foreignST.Redos.SelectMany(kgroup => kgroup.Select(elem => new KeyValuePair<TStateId, StatePatch>(kgroup.Key, elem)));
+			var newRedos = flatPairs.Where(kv => cmp.Compare(m_currentTime.Event, kv.Value.FromRev) <= 0)
+								.ToLookup(p => p.Key, p => p.Value);
+			var localRedo = new RedoEntry();
+			localRedo.LocalChanges = new Dictionary<TStateId, StatePatch>();
+			// TODO: external changes to our local states should be seen as local changes in the pull event
+
+			if (!MergeSpacetime(foreignST.Timestamp, newRedos, ref evtFinal))
+				throw new ApplicationException(string.Format("Failed to pull from Spacetime { {0} }", foreignST.Timestamp.ToString()));
+
 			CommitAdvance(evtOri, evtFinal, localRedo);
 		}
 	}
