@@ -127,7 +127,29 @@ namespace HTS
 
 		public override string ToString()
 		{
-			return m_impl.ToString();
+			return GetDebugString();
+		}
+
+		public string GetDebugString()
+		{
+
+			var sb = new StringBuilder();
+			RecursiveDebugString(sb, m_impl, 0, m_impl.GetMaxDepth());
+			return sb.ToString();
+		}
+
+		public static void RecursiveDebugString(StringBuilder sb, itc.Identity id, int depth, int maxDepth)
+		{
+			if (id.IsSimplex())
+			{
+				for (int ii = 0; ii < (1 << (maxDepth - depth)); ++ii )
+					sb.AppendFormat("{0}|", (id.IsOne() ? 1 : 0));
+			}
+			else
+			{
+				RecursiveDebugString(sb, id.Left, depth + 1, maxDepth);
+				RecursiveDebugString(sb, id.Right, depth + 1, maxDepth);
+			}
 		}
     }
 
@@ -136,9 +158,9 @@ namespace HTS
     /// </summary>
     class ITCIdentityFactory : IHIdFactory
     {
-        const uint INITIAL_SIZE = 32;
-        const uint BATCH_SIZE = 16;
-        const uint SEED_RATIO = 4;  // TODO: use it to replace the one seed approach
+        readonly uint INITIAL_SIZE = 32;
+        readonly uint BATCH_SIZE = 16;
+        readonly uint SEED_RATIO = 4;  // TODO: use it to replace the one seed approach
 
         struct FreelistEntry
         {
@@ -147,10 +169,13 @@ namespace HTS
             public List<ITCIdentity> remains;
         }
         ITCIdentity m_root;
-        ConcurrentDictionary<itc.Identity, FreelistEntry > m_freelist;
+		ConcurrentDictionary<itc.Identity, FreelistEntry> m_freelist;
 
         public ITCIdentityFactory()
         {
+			INITIAL_SIZE = 8; // For debug
+			BATCH_SIZE = 8;
+
 			m_root = ITCIdentity.CreateRootID();
             m_freelist = new ConcurrentDictionary<itc.Identity, FreelistEntry>();
 

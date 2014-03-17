@@ -200,16 +200,11 @@ namespace itcsharp
             }
         }
 
-        private int MaxDepth(int depth)
-        {
-            if (Left == null && Right == null)
-                return depth;
-            return Math.Max(Left.MaxDepth(depth + 1), Right.MaxDepth(depth + 1));
-        }
-
         public int MaxDepth()
         {
-            return MaxDepth(0);
+            if (IsSimplex())
+                return 0;
+            return Math.Max(Left.MaxDepth(), Right.MaxDepth())+1;
         }
 
         // Utils

@@ -15,6 +15,6 @@ namespace CollisionTest.States
 		public float Balance;
 
         public Account(Spacetime spaceTime, IHTimestamp stamp) : base(spaceTime,stamp) { }
-		public Account(TStateId sid, IHTimestamp stamp) : base(sid, null, stamp, StatePatchMethod.Customized) { }
+		public Account(TStateId sid, Spacetime spaceTime, IHTimestamp stamp) : base(sid, spaceTime, stamp, StatePatchMethod.Auto) { }
     }
 }

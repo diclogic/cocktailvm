@@ -54,11 +54,11 @@ namespace Representation
 			PseudoSyncMgr.Instance.PullFromVmSt(m_secondST.ID);
 
 
-			var newAccount = m_initialST.CreateState((st, stamp) => new Account(st, stamp));
+			var newAccount = m_initialST.CreateState((st, stamp) => new Account(TStateId.DebugCreate(111), st, stamp));
 			m_namingSvc.RegisterObject(newAccount.StateId.ToString(), newAccount.GetType().ToString(), newAccount);
 			m_accounts.Add(newAccount as Account);
 
-			newAccount = m_secondST.CreateState((st, stamp) => new Account(st, stamp));
+			newAccount = m_secondST.CreateState((st, stamp) => new Account(TStateId.DebugCreate(222), st, stamp));
 			m_namingSvc.RegisterObject(newAccount.StateId.ToString(), newAccount.GetType().ToString(), newAccount);
 			m_accounts.Add(newAccount as Account);
 
@@ -77,7 +77,8 @@ namespace Representation
 
 			foreach (var acc in m_accounts)
 			{
-				m_initialST.Execute("Deposit", Utils.MakeArgList("account", new RemoteStateRef(acc.StateId,acc.GetType().ToString())), (float)900);
+				if (!m_initialST.Execute("Deposit", Utils.MakeArgList("account", new RemoteStateRef(acc.StateId, acc.GetType().ToString())), (float)900))
+					throw new InvalidOperationException();
 			}
 			SyncSpacetimes();
 
@@ -88,8 +89,8 @@ namespace Representation
 
 		void SyncSpacetimes()
 		{
-			m_spacetimes[1].PullAllFrom(m_spacetimes[0].Snapshot());
-			m_spacetimes[0].PullAllFrom(m_spacetimes[1].Snapshot());
+			m_spacetimes[1].PullAllFrom(m_spacetimes[0].Snapshot(m_spacetimes[1].LatestEvent));
+			m_spacetimes[0].PullAllFrom(m_spacetimes[1].Snapshot(m_spacetimes[0].LatestEvent));
 		}
 
 		void UpdateWorld(float interval)

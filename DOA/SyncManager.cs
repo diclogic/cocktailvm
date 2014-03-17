@@ -27,13 +27,13 @@ namespace DOA
 			}
 		}
 
-		public SpacetimeSnapshot? GetSpacetime(IHId id)
+		public SpacetimeSnapshot? GetSpacetime(IHId id, IHEvent evtAck)
 		{
 			lock (m_lock)
 			{
 				Spacetime st;
 				if (m_spaceTimes.TryGetValue(id, out st))
-					return st.Snapshot();
+					return st.Snapshot(evtAck);
 
 				return null;
 			}
@@ -57,7 +57,7 @@ namespace DOA
 
 		public void PullFromVmSt(IHId spacetimeId)
 		{
-			m_spaceTimes[spacetimeId].PullFromVmSt(m_vmST.Snapshot(), m_vmStateId);
+			m_spaceTimes[spacetimeId].PullFromVmSt(m_vmST.Snapshot(HTSFactory.CreateZeroEvent()), m_vmStateId);
 		}
 	}
 }

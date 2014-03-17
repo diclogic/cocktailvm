@@ -85,6 +85,7 @@ namespace Cocktail
 		private Dictionary<IHId, ExternalSTEntry> m_cachedExternalST = new Dictionary<IHId, ExternalSTEntry>();
 
 		public IHId ID { get { return m_currentTime.ID; } }
+		public IHEvent LatestEvent { get { return m_currentTime.Event; } }
 
         public Spacetime(IHTimestamp stamp, IHIdFactory idFactory)
 			:this(stamp, idFactory, Enumerable.Empty<State>())
@@ -115,7 +116,7 @@ namespace Cocktail
 
 		public State CreateState(Func<Spacetime, IHTimestamp, State> constructor)
         {
-            var event_ = BeginAdvance();
+            var event_ = BeginEventAdvance();
             var newState = constructor(this, m_currentTime);
 			m_states.Add(newState.StateId, newState);
 			m_nativeStates.Add(newState.StateId, newState);
@@ -126,7 +127,7 @@ namespace Cocktail
 			var patch = newState.GetSnapshot(event_).GenerateCreatePatch(m_currentTime.Event);
 			redo.LocalChanges.Add(newState.StateId, patch);
 
-            CommitAdvance(event_, redo);
+			CommitAdvance(event_, Enumerable.Repeat(newState, 1), redo);
             return newState;
         }
 
@@ -148,7 +149,8 @@ namespace Cocktail
 			}
 		}
 
-		public SpacetimeSnapshot Snapshot()
+
+		public SpacetimeSnapshot Snapshot(IHEvent evtAck)
 		{
 			lock (m_executionLock)
 			{
@@ -156,10 +158,11 @@ namespace Cocktail
 					Timestamp = m_currentTime,
 					States = m_states.Values,
 					Redos = m_RedoList.Aggregate(new List<KeyValuePair<TStateId, StatePatch>>(),
-												(accu,item) =>
+												(accu,entry) =>
 													{
-														foreach (var sp in item.LocalChanges)
-															accu.Add(sp);
+														if (!entry.Rev.LtEq(evtAck))
+															foreach (var sp in entry.LocalChanges)
+																accu.Add(sp);
 														return accu;
 													}
 												).ToLookup(kv => kv.Key, kv => kv.Value)
@@ -194,7 +197,7 @@ namespace Cocktail
 			if (count <= 1)
 				return new Spacetime[] { this };
 			var ids = m_idFactory.CreateChildren(ID, count);
-			var event_ = BeginAdvance();
+			var event_ = BeginEventAdvance();
 
 			var redo = new RedoEntry();
 
@@ -205,7 +208,7 @@ namespace Cocktail
 					redo.LocalChanges.Add(iter.Current.StateId, StatePatcher.GenerateDestroyPatch(event_, iter.Current.LatestUpdate.Event));
 					return new Spacetime(id, event_, m_idFactory, new State[] { iter.Current });
 				});
-			CommitAdvance(event_, redo);
+			CommitAdvance(event_, m_nativeStates.Values, redo);
 			return retval;
 		}
 
@@ -251,17 +254,17 @@ namespace Cocktail
 			}
 		}
 
-		public void Execute(string funcName, IEnumerable<KeyValuePair<string, StateRef>> stateParams, params object[] constArgs)
+		public bool Execute(string funcName, IEnumerable<KeyValuePair<string, StateRef>> stateParams, params object[] constArgs)
 		{
 			lock (m_executionLock)
 			{
-				ExecuteArgs(funcName, stateParams, constArgs);
+				return ExecuteArgs(funcName, stateParams, constArgs);
 			}
 		}
 
 		protected bool ExecuteArgs(string funcName, IEnumerable<KeyValuePair<string,StateRef>> stateParams, IEnumerable<object> constArgs)
 		{
-			IHEvent evtOriginal,evtFinal;
+			IHEvent evtOriginal, evtFinal;
 			while ((evtOriginal = BeginAdvance()) == null) ;
 			evtFinal = evtOriginal;
 
@@ -282,7 +285,7 @@ namespace Cocktail
 				}
 				foreignSTIds = foreignStates.Select(kv=>kv.Key).Distinct();
 
-				var foreignSTs = foreignSTIds.Select(id => PseudoSyncMgr.Instance.GetSpacetime(id))
+				var foreignSTs = foreignSTIds.Select(id => PseudoSyncMgr.Instance.GetSpacetime(id, evtOriginal))
 											.Where(val=>val.HasValue)
 											.ToDictionary(val=>val.Value.Timestamp.ID, val=>val.Value);
 
@@ -326,6 +329,8 @@ namespace Cocktail
 
 			//-------- execute ---------
 
+			evtFinal = evtFinal.Advance(ID);
+
 			m_vm.Call(funcName, stateParams, constArgs.ToArray());
 
 			//----- make redo -------
@@ -360,22 +365,24 @@ namespace Cocktail
 			}
 
 			// ---------- commit to local ST ------------
-			CommitAdvance(evtOriginal, evtFinal, redo);
+			CommitAdvance(evtOriginal, evtFinal, states, redo);
 
 			// Push native changes to spacetimes that are highly depend on us
 
 			return true;
 		}
 
-
+		// TODO: the operation should not change spacetime data because it's not committed yet
 		private bool MergeSpacetime(IHTimestamp foreignStamp, ILookup<TStateId, StatePatch> redos, ref IHEvent expectingEvent)
 		{
+			var expectingEventCopy = expectingEvent;
 			// all states are put into m_states
 			var newStates = new Dictionary<TStateId, State>();
 			foreach (var fst in redos)
 			{
 				var fstateId = fst.Key;
-				var patches = fst.OrderBy(patch => patch.FromRev, HTSFactory.GetEventComparer(foreignStamp.ID));
+				var patches = fst.OrderBy(patch => patch.FromRev, HTSFactory.GetEventComparer(foreignStamp.ID))
+								.SkipWhile(patch => patch.ToRev.LtEq(expectingEventCopy)); // we use the expecting event because one event can be sync'ed from 2 sources
 
 				foreach (var p in patches)
 					p.data.Seek(0, SeekOrigin.Begin);
@@ -385,11 +392,12 @@ namespace Cocktail
 				{
 
 					if (!StatePatcher.TryCreateFromPatch(foreignStamp.ID, fstateId, patches.First(), out lst))
-						return false;
+						throw new ApplicationException(string.Format("State {0} not found in current ST {1} and the first patch is not constructive patch {2}",fstateId, ID, patches.First().Flag ));
+					m_states.Add(fstateId, lst);
 				}
 
 				foreach (var patch in patches)
-					if (!lst.Merge(patch))
+					if (!lst.Patch(patch))
 						return false;
 
 				newStates.Add(fstateId, lst);
@@ -419,7 +427,7 @@ namespace Cocktail
 		//    return event_;
 		//}
 
-        private IHEvent BeginAdvance()
+        private IHEvent BeginEventAdvance()
         {
             var newTime = m_currentTime.FireEvent();
 			var oldVal = Interlocked.CompareExchange(ref m_executingEvent, newTime.Event, null);
@@ -431,9 +439,20 @@ namespace Cocktail
             return newTime.Event;
         }
 
-		private void CommitAdvance(IHEvent evt, RedoEntry redo) { CommitAdvance(evt, evt, redo); }
+		private IHEvent BeginAdvance()
+		{
+			var retval = m_currentTime;
+			var oldVal = Interlocked.CompareExchange(ref m_executingEvent, retval.Event, null);
+			if (oldVal != null)
+				return null;
 
-        private void CommitAdvance(IHEvent evtOriginal, IHEvent evtFinal, RedoEntry redo)
+			// pull don't necessarily have event increment on local component as long as the final result event is identifiable (by the component of external ST)
+			return retval.Event;
+		}
+
+		private void CommitAdvance(IHEvent evt, IEnumerable<State> states, RedoEntry redo) { CommitAdvance(evt, evt, states, redo); }
+
+		private void CommitAdvance(IHEvent evtOriginal, IHEvent evtFinal, IEnumerable<State> states, RedoEntry redo)
         {
 			// If current time is not compatible to committing event
             if (!m_currentTime.Event.LtEq(evtFinal))
@@ -447,6 +466,8 @@ namespace Cocktail
 			//atomic{
 			Interlocked.Exchange(ref m_executingEvent, null);
 			m_currentTime = new ITCTimestamp(m_currentTime.ID as ITCIdentity, evtFinal as ITCEvent);
+			foreach (var s in states)
+				s.OnCommitting(evtFinal);
 			redo.Rev = evtFinal;
 			m_RedoList.Add(redo);
 			//}
@@ -501,7 +522,7 @@ namespace Cocktail
 				return false;
 
 			m_isWaitingForPullRequest = false;
-			CommitAdvance(evtOriginal, evtFinal, redo);
+			CommitAdvance(evtOriginal, evtFinal, Enumerable.Empty<State>(), redo);
 			return true;
 		}
 
@@ -526,7 +547,7 @@ namespace Cocktail
 				throw new ApplicationException("VM Spacetime don't contain the VMState");
 
 			m_vm = (VMState)vmState;
-			CommitAdvance(evtOri, evtFinal, localRedo);
+			CommitAdvance(evtOri, evtFinal, Enumerable.Empty<State>(), localRedo);
 		}
 
 		public void PullAllFrom(SpacetimeSnapshot foreignST)
@@ -541,12 +562,12 @@ namespace Cocktail
 								.ToLookup(p => p.Key, p => p.Value);
 			var localRedo = new RedoEntry();
 			localRedo.LocalChanges = new Dictionary<TStateId, StatePatch>();
-			// TODO: external changes to our local states should be seen as local changes in the pull event
+			// TODO: external changes to our local states should be seen as local changes in the pull event?
 
 			if (!MergeSpacetime(foreignST.Timestamp, newRedos, ref evtFinal))
-				throw new ApplicationException(string.Format("Failed to pull from Spacetime { {0} }", foreignST.Timestamp.ToString()));
+				throw new ApplicationException(string.Format("Failed to pull from Spacetime {0}, to local {1}", foreignST.Timestamp.ToString(), m_currentTime));
 
-			CommitAdvance(evtOri, evtFinal, localRedo);
+			CommitAdvance(evtOri, evtFinal, Enumerable.Empty<State>(), localRedo);
 		}
 	}
 }

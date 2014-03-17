@@ -78,7 +78,7 @@ namespace itcsharp
         public int GetMaxDepth()
         {
             if (IsSimplex())
-                return 1;
+                return 0;
             return Math.Max(Left.GetMaxDepth(), Right.GetMaxDepth()) + 1;
         }
 

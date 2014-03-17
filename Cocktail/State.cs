@@ -27,6 +27,13 @@ namespace Cocktail
 			m_val = val;
 		}
 
+		public static TStateId DebugCreate(ulong val)
+		{
+			TStateId retval;
+			retval.m_val = val;
+			return retval;
+		}
+
 		public int CompareTo(object rhs)
 		{
 			if (rhs.GetType().Equals(this))
@@ -91,11 +98,6 @@ namespace Cocktail
 		public bool IsCompatible(IHTimestamp stamp)
 		{
 			return LatestUpdate.Event.LtEq(stamp.Event);
-		}
-
-		public virtual bool Merge(/*StateSnapshot snapshot,*/ StatePatch patch)
-		{
-			return Patch(patch);
 		}
 
 		public bool Patch(StatePatch patch)
@@ -167,16 +169,16 @@ namespace Cocktail
 
 		}
 
-		public virtual void DoSerialize(Stream ostream, StateSnapshot oldSnapshot) { }
+		public virtual void DoSerialize(Stream ostream, StateSnapshot oldSnapshot) { throw new NotImplementedException(); }
 
 		public StateSnapshot GetSnapshot() { return GetSnapshot(LatestUpdate); }
 		public StateSnapshot GetSnapshot( IHEvent overridingEvent)
 		{
 			return GetSnapshot(HTSFactory.Make(LatestUpdate.ID, overridingEvent));
 		}
+
 		public StateSnapshot GetSnapshot( IHTimestamp overridingTS)
 		{
-
 			var retval = new StateSnapshot(StateId, GetType().FullName, overridingTS);
 
 			if (m_patchMethod == StatePatchMethod.Customized)
@@ -196,7 +198,13 @@ namespace Cocktail
 			}
 			return retval;
 		}
+
 		public virtual StateSnapshot DoSnapshot(StateSnapshot initial) { throw new NotImplementedException(); }
+
+		internal void OnCommitting(IHEvent evtFinal)
+		{
+			LatestUpdate = HTSFactory.Make(LatestUpdate.ID, evtFinal);
+		}
 	}
 }
 

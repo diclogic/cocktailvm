@@ -71,7 +71,17 @@ namespace HTS
 
 		public override string ToString()
 		{
-			return m_impl.ToString();
+			var maxDepth = Math.Max(m_impl.ID.GetMaxDepth(), m_impl.Event.MaxDepth());
+
+			var sb = new StringBuilder();
+			ITCIdentity.RecursiveDebugString(sb, m_impl.ID, 0, maxDepth);
+			var idStr = sb.ToString();
+
+			sb.Clear();
+			ITCEvent.RecursiveDebugString(sb, m_impl.Event, 0, 0, maxDepth);
+			var eventStr = sb.ToString();
+
+			return string.Format("[({0})|({1})]", idStr, eventStr);
 		}
     }
 }
