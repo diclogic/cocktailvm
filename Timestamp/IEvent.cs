@@ -8,6 +8,9 @@ namespace HTS
 {
     public interface IHEvent
     {
+		/// <summary>
+		/// Means lhs (potentially) 'causes' rhs, and rhs fully knows lhs
+		/// </summary>
         bool LtEq(IHEvent rhs);
 		IHEvent Advance(IHId id);
     }
