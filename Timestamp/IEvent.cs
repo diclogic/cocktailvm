@@ -11,7 +11,7 @@ namespace HTS
 		/// <summary>
 		/// Means lhs (potentially) 'causes' rhs, and rhs fully knows lhs
 		/// </summary>
-        bool LtEq(IHEvent rhs);
+        bool KnownBy(IHEvent rhs);
 		IHEvent Advance(IHId id);
     }
 
@@ -26,9 +26,9 @@ namespace HTS
 		public int Compare(IHEvent x, IHEvent y)
 		{
 			//TODO: use mask
-			if (!x.LtEq(y))
+			if (!x.KnownBy(y))
 				return 1;
-			if (!y.LtEq(x))
+			if (!y.KnownBy(x))
 				return -1;
 			return 0;
 		}
@@ -44,9 +44,14 @@ namespace HTS
 
 		public itc.Event GetImpl() { return m_impl; }
 
-		public bool LtEq(IHEvent rhs)
+		public bool KnownBy(IHEvent rhs)
 		{
 			return itc.Event.Leq(m_impl, (rhs as ITCEvent).m_impl);
+		}
+
+		public bool HappenedBefore(IHEvent rhs)
+		{
+			throw new NotImplementedException();
 		}
 
 		public IHEvent Advance(IHId id)

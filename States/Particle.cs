@@ -16,8 +16,8 @@ namespace CollisionTest.States
 		public Vector3 accel = new Vector3(0, 0, 0);
 		public Vector3 velocity = new Vector3(0, 0, 0);
 
-        public Particle(Spacetime spaceTime, IHTimestamp creationStamp)
-            : base(spaceTime, creationStamp)
+        public Particle( IHTimestamp creationStamp)
+            : base( creationStamp)
         {
 
         }

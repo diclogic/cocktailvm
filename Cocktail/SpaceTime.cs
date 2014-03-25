@@ -110,7 +110,7 @@ namespace Cocktail
 			m_nativeStates = initialStates.ToDictionary((s) => s.StateId);
 
 			// every ST must have the minimal VM since the very beginning, VM's life time has no beginning nor an end
-			m_vm = new VMState(this, stamp);
+			m_vm = new VMState(stamp);
 			m_states.Add(m_vm.StateId, m_vm);
 		}
 
@@ -161,7 +161,7 @@ namespace Cocktail
 					Redos = m_RedoList.Aggregate(new List<KeyValuePair<TStateId, StatePatch>>(),
 												(accu,entry) =>
 													{
-														if (!entry.Rev.LtEq(evtAck))
+														if (!entry.Rev.KnownBy(evtAck))
 															foreach (var sp in entry.LocalChanges)
 																accu.Add(sp);
 														return accu;
@@ -207,7 +207,7 @@ namespace Cocktail
 			var retval = ids.Select((id) =>
 				{
 					iter.MoveNext();
-					redo.LocalChanges.Add(iter.Current.StateId, StatePatcher.GenerateDestroyPatch(evtFinal, iter.Current.LatestUpdate.Event));
+					redo.LocalChanges.Add(iter.Current.StateId, StatePatcher.GenerateDestroyPatch(evtFinal, iter.Current.LatestUpdate));
 					return new Spacetime(id, evtFinal, m_idFactory, new State[] { iter.Current });
 				});
 			CommitChronon(evtOriginal, evtFinal, m_nativeStates.Values, redo);
@@ -229,8 +229,8 @@ namespace Cocktail
 			lock (m_executionLock)
 			{
 				// if compatible, sort it into the list
-				if (fraction.timeStamp.Event.LtEq(m_executingEvent)
-					&& fraction.timeStamp.Event.LtEq(m_currentTime.Event))
+				if (fraction.timeStamp.Event.KnownBy(m_executingEvent)
+					&& fraction.timeStamp.Event.KnownBy(m_currentTime.Event))
 				{
 					m_incomingExecutions.Add( fraction.timeStamp.Event, fraction );
 					return true;
@@ -306,7 +306,7 @@ namespace Cocktail
 				IHTimestamp failingST = null;
 				foreach (var st in foreignSTs)
 				{
-					if (!MergeSpacetime(st.Value.Timestamp, st.Value.Redos, ref evtFinal))
+					if (!DoPullFrom(st.Value.Timestamp, st.Value.Redos, ref evtFinal))
 					{
 						failingST = st.Value.Timestamp;
 						break;
@@ -374,7 +374,7 @@ namespace Cocktail
 		}
 
 		// TODO: the operation should not change spacetime data because it's not committed yet
-		private bool MergeSpacetime(IHTimestamp foreignStamp, ILookup<TStateId, StatePatch> redos, ref IHEvent expectingEvent)
+		private bool DoPullFrom(IHTimestamp foreignStamp, ILookup<TStateId, StatePatch> redos, ref IHEvent expectingEvent)
 		{
 			var expectingEventCopy = expectingEvent;
 			// all states are put into m_states
@@ -383,15 +383,14 @@ namespace Cocktail
 			{
 				var fstateId = fst.Key;
 				var patches = fst.OrderBy(patch => patch.FromRev, HTSFactory.GetEventComparer(foreignStamp.ID))
-								.SkipWhile(patch => patch.ToRev.LtEq(expectingEventCopy)); // we use the expecting event because one event can be sync'ed from 2 sources
+								.SkipWhile(patch => patch.ToRev.KnownBy(expectingEventCopy)); // we use the expecting event because one event can be sync'ed from 2 sources
 
-				foreach (var p in patches)
-					p.data.Seek(0, SeekOrigin.Begin);
+				//foreach (var p in patches)
+				//    p.data.Seek(0, SeekOrigin.Begin);
 
 				State lst;
 				if (!m_states.TryGetValue(fstateId, out lst))
 				{
-
 					if (!StatePatcher.TryCreateFromPatch(foreignStamp.ID, fstateId, patches.First(), out lst))
 						throw new ApplicationException(string.Format("State {0} not found in current ST {1} and the first patch is not constructive patch {2}",fstateId, ID, patches.First().Flag ));
 					m_states.Add(fstateId, lst);
@@ -439,12 +438,10 @@ namespace Cocktail
 			return retval.Event;
 		}
 
-		private void CommitChronon(IHEvent evt, IEnumerable<State> states, RedoEntry redo) { CommitChronon(evt, evt, states, redo); }
-
 		private void CommitChronon(IHEvent evtOriginal, IHEvent evtFinal, IEnumerable<State> states, RedoEntry redo)
         {
 			// If current time is not compatible to committing event
-            if (!m_currentTime.Event.LtEq(evtFinal))
+            if (!m_currentTime.Event.KnownBy(evtFinal))
 				throw new ApplicationException("The event is out dated, recalculation needed");
 
 			// This check is not mature, event value could grow further if sync/merge involved
@@ -490,7 +487,7 @@ namespace Cocktail
 				m_isWaitingForPullRequest = true;
 			}
 
-			if (m_currentTime.Event.LtEq(evtOriginal))
+			if (m_currentTime.Event.KnownBy(evtOriginal))
 			{
 				return PrePullResult.Succeeded;
 			}
@@ -506,7 +503,7 @@ namespace Cocktail
 			var redo = new RedoEntry();
 			redo.LocalChanges = new Dictionary<TStateId, StatePatch>();
 
-			bool bOK = MergeSpacetime(HTSFactory.Make(idRequester, foreignExpectedEvent), redos, ref evtFinal);
+			bool bOK = DoPullFrom(HTSFactory.Make(idRequester, foreignExpectedEvent), redos, ref evtFinal);
 			if (!bOK)
 				return false;
 
@@ -528,7 +525,7 @@ namespace Cocktail
 			var localRedo = new RedoEntry();
 			localRedo.LocalChanges = new Dictionary<TStateId, StatePatch>();
 
-			if (!MergeSpacetime(vmST.Timestamp, newRedos, ref evtFinal))
+			if (!DoPullFrom(vmST.Timestamp, newRedos, ref evtFinal))
 				throw new ApplicationException("Failed to pull from VM Spacetime");
 
 			State vmState;
@@ -553,7 +550,7 @@ namespace Cocktail
 			localRedo.LocalChanges = new Dictionary<TStateId, StatePatch>();
 			// TODO: external changes to our local states should be seen as local changes in the pull event?
 
-			if (!MergeSpacetime(foreignST.Timestamp, newRedos, ref evtFinal))
+			if (!DoPullFrom(foreignST.Timestamp, newRedos, ref evtFinal))
 				throw new ApplicationException(string.Format("Failed to pull from Spacetime {0}, to local {1}", foreignST.Timestamp.ToString(), m_currentTime));
 
 			CommitChronon(evtOri, evtFinal, Enumerable.Empty<State>(), localRedo);

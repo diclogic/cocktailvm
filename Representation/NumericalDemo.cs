@@ -54,11 +54,11 @@ namespace Representation
 			PseudoSyncMgr.Instance.PullFromVmSt(m_secondST.ID);
 
 
-			var newAccount = m_initialST.CreateState((st, stamp) => new Account(TStateId.DebugCreate(111), st, stamp));
+			var newAccount = m_initialST.CreateState((st, stamp) => new Account(TStateId.DebugCreate(111), stamp));
 			m_namingSvc.RegisterObject(newAccount.StateId.ToString(), newAccount.GetType().ToString(), newAccount);
 			m_accounts.Add(newAccount as Account);
 
-			newAccount = m_secondST.CreateState((st, stamp) => new Account(TStateId.DebugCreate(222), st, stamp));
+			newAccount = m_secondST.CreateState((st, stamp) => new Account(TStateId.DebugCreate(222), stamp));
 			m_namingSvc.RegisterObject(newAccount.StateId.ToString(), newAccount.GetType().ToString(), newAccount);
 			m_accounts.Add(newAccount as Account);
 

@@ -51,7 +51,7 @@ namespace DOA
 			Entry retval;
 			if (m_objects.TryGetValue(objName, out retval))
 			{
-				return retval.ptr.LatestUpdate.ID;
+				return retval.ptr.SpacetimeID;
 			}
 
 			return null;

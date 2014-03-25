@@ -24,8 +24,8 @@ namespace Cocktail
 		[StateField(PatchKind = FieldPatchKind.CommutativeDelta)]
 		private Dictionary<string, FunctionMetadata> m_functionMetadatas = new Dictionary<string, FunctionMetadata>();
 
-		public VMState(Spacetime st, IHTimestamp stamp)
-			: base(new TStateId(19830602), st, stamp, StatePatchMethod.Customized)
+		public VMState( IHTimestamp stamp)
+			: base(new TStateId(19830602), stamp.ID, stamp.Event, StatePatchMethod.Customized)
 		{
 			m_interpreter = new Interpreter();
 			m_interpreter.DeclareAndLink("Cocktail.DeclareAndLink", typeof(Interpreter).GetMethod("DeclareAndLink_cocktail"));

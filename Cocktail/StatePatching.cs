@@ -52,10 +52,22 @@ namespace Cocktail
 
 	public class StatePatch
 	{
+		public byte[] m_data;
 		public IHEvent FromRev;
 		public IHEvent ToRev;
 		public StatePatchFlag Flag;
-		public Stream data;
+		public Stream DataStream
+		{
+			get { return new MemoryStream(m_data); }
+		}
+
+		public StatePatch(StatePatchFlag flag, IHEvent fromRev, IHEvent toRev, byte[] data)
+		{
+			m_data = data;
+			FromRev = fromRev;
+			ToRev = toRev;
+			Flag = flag;
+		}
 	}
 
 	[Serializable]
@@ -126,10 +138,7 @@ namespace Cocktail
 
 		public static StatePatch GenerateDestroyPatch(IHEvent expectingEvent, IHEvent oriEvent)
 		{
-			var retval = new StatePatch();
-			retval.FromRev = oriEvent;
-			retval.ToRev = expectingEvent;
-			retval.Flag = StatePatchFlag.Destroy;
+			var retval = new StatePatch(StatePatchFlag.Destroy, oriEvent, expectingEvent, new byte[0]);
 			return retval;
 		}
 
@@ -142,11 +151,9 @@ namespace Cocktail
 			header.Write(ostream);
 			GeneratePatch(ostream, newState, pseudoOld, FieldPatchKind.Replace);
 
-			var retval = new StatePatch();
-			retval.Flag = StatePatchFlag.Create;
-			retval.FromRev = pseudoOld.Timestamp.Event;
-			retval.ToRev = newState.Timestamp.Event;
-			retval.data = ostream;
+			var retval = new StatePatch(StatePatchFlag.Create, pseudoOld.Timestamp.Event,
+										 newState.Timestamp.Event,
+										 ostream.ToArray());
 			return retval;
 		}
 
@@ -172,11 +179,10 @@ namespace Cocktail
 		{
 			var ostream = new MemoryStream();
 			GeneratePatch(ostream, newState, oldState, forceKind);
-			var retval = new StatePatch();
-			retval.Flag = GetPatchFlag(newState);
-			retval.FromRev = oldState.Timestamp.Event;
-			retval.ToRev = newState.Timestamp.Event;
-			retval.data = ostream;
+			var retval = new StatePatch( GetPatchFlag(newState),
+							 oldState.Timestamp.Event,
+							 newState.Timestamp.Event,
+							 ostream.ToArray());
 			return retval;
 		}
 
@@ -221,7 +227,7 @@ namespace Cocktail
 				return false;
 			}
 
-			var header = new StateCreationHeader(patch.data);
+			var header = new StateCreationHeader(patch.DataStream);
 			var type = Type.GetType(header.AssemblyQualifiedClassName);
 			// newly created state must start from "FromRev"
 			created = (State)Activator.CreateInstance(type, stateId, (Spacetime)null, HTSFactory.Make(hostST, patch.FromRev));

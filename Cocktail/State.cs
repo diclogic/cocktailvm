@@ -66,27 +66,29 @@ namespace Cocktail
 	{
 		static Random m_seed = new Random();
 
-		private Spacetime m_spaceTime;					//< the space-time it belongs to
 		private StatePatch m_pendingPatch;
 		private readonly StatePatchMethod m_patchMethod;
 
+
+
 		public TStateId StateId { get; protected set; }	//< to identify a state
-		public IHTimestamp LatestUpdate { get; private set; }
+		public IHId SpacetimeID { get; private set; }
+		public IHEvent LatestUpdate { get; private set; }
 
-		public State(Spacetime spaceTime, IHTimestamp stamp)
-			: this(spaceTime, stamp, StatePatchMethod.Auto)
+		public State(IHTimestamp stamp)
+			: this(stamp, StatePatchMethod.Auto)
 		{
 		}
 
-		public State(Spacetime spaceTime, IHTimestamp stamp, StatePatchMethod patchMethod)
-			: this(new TStateId(m_seed), spaceTime, stamp, patchMethod)
+		public State(IHTimestamp stamp, StatePatchMethod patchMethod)
+			: this(new TStateId(m_seed), stamp.ID, stamp.Event, patchMethod)
 		{
 		}
-		public State(TStateId stateId, Spacetime spaceTime, IHTimestamp stamp, StatePatchMethod patchMethod)
+
+		public State(TStateId stateId, IHId spacetimeId, IHEvent expectingEvent, StatePatchMethod patchMethod)
 		{
 			StateId = stateId;
-			m_spaceTime = spaceTime;
-			LatestUpdate = stamp;
+			LatestUpdate = expectingEvent;
 			m_patchMethod = patchMethod;
 		}
 
@@ -97,17 +99,17 @@ namespace Cocktail
 
 		public bool IsCompatible(IHTimestamp stamp)
 		{
-			return LatestUpdate.Event.LtEq(stamp.Event);
+			return LatestUpdate.KnownBy(stamp.Event);
 		}
 
 		public bool Patch(StatePatch patch)
 		{
-			return Patch(patch.FromRev, patch.ToRev, patch.data);
+			return Patch(patch.FromRev, patch.ToRev, patch.DataStream);
 		}
 
 		public bool Patch(IHEvent fromRev, IHEvent toRev, Stream delta)
 		{
-			if (toRev.LtEq(LatestUpdate.Event))
+			if (toRev.KnownBy(LatestUpdate))
 				throw new ApplicationException("Trying to update to an older revision");
 
 			if (m_patchMethod == StatePatchMethod.Auto)
@@ -146,13 +148,10 @@ namespace Cocktail
 			var ostream = new MemoryStream();
 			Serialize(ostream, oldSnapshot);
 
-			var patch = new StatePatch()
-			{
-				FromRev = oldSnapshot.Timestamp.Event,
-				ToRev = expectingEvent,
-				Flag = this.GetPatchFlag(),
-				data = ostream
-			};
+			var patch = new StatePatch( this.GetPatchFlag(),
+				 oldSnapshot.Timestamp.Event,
+				 expectingEvent,
+				 ostream.ToArray() );
 			return patch;
 		}
 
@@ -174,7 +173,7 @@ namespace Cocktail
 		public StateSnapshot GetSnapshot() { return GetSnapshot(LatestUpdate); }
 		public StateSnapshot GetSnapshot( IHEvent overridingEvent)
 		{
-			return GetSnapshot(HTSFactory.Make(LatestUpdate.ID, overridingEvent));
+			return GetSnapshot(HTSFactory.Make(SpacetimeID, overridingEvent));
 		}
 
 		public StateSnapshot GetSnapshot( IHTimestamp overridingTS)
@@ -203,7 +202,7 @@ namespace Cocktail
 
 		internal void OnCommitting(IHEvent evtFinal)
 		{
-			LatestUpdate = HTSFactory.Make(LatestUpdate.ID, evtFinal);
+			LatestUpdate = evtFinal;
 		}
 	}
 }
