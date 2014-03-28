@@ -88,6 +88,7 @@ namespace Cocktail
 		public State(TStateId stateId, IHId spacetimeId, IHEvent expectingEvent, StatePatchMethod patchMethod)
 		{
 			StateId = stateId;
+			SpacetimeID = spacetimeId;
 			LatestUpdate = expectingEvent;
 			m_patchMethod = patchMethod;
 		}
@@ -102,9 +103,9 @@ namespace Cocktail
 			return LatestUpdate.KnownBy(stamp.Event);
 		}
 
-		public bool Patch(StatePatch patch)
+		public bool Patch(StatePatchingCtx patchCtx)
 		{
-			return Patch(patch.FromRev, patch.ToRev, patch.DataStream);
+			return Patch(patchCtx.Metadata.FromRev, patchCtx.Metadata.ToRev, patchCtx.DataStream);
 		}
 
 		public bool Patch(IHEvent fromRev, IHEvent toRev, Stream delta)
@@ -147,6 +148,7 @@ namespace Cocktail
 		{
 			var ostream = new MemoryStream();
 			Serialize(ostream, oldSnapshot);
+			ostream.Close();
 
 			var patch = new StatePatch( this.GetPatchFlag(),
 				 oldSnapshot.Timestamp.Event,

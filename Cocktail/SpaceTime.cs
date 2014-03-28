@@ -12,6 +12,7 @@ using System.Reflection;
 using System.Collections.Concurrent;
 
 using SnapshotPair = itcsharp.Pair<Cocktail.State,Cocktail.StateSnapshot>;
+using System.Diagnostics;
 
 namespace Cocktail
 {
@@ -24,12 +25,6 @@ namespace Cocktail
 	internal class SpaceTimeMeta
 	{
 
-	}
-
-	public struct ExternalSTEntry
-	{
-		public IHTimestamp LatestUpateTime;
-		public Dictionary<TStateId,State> States;
 	}
 
 	public struct SpacetimeSnapshot
@@ -53,7 +48,7 @@ namespace Cocktail
     /// 2) 2 SpaceTimes can merge into 1
     /// 3) SpaceTime cannot cross machine boundary (we need something else to do distributed transaction)
     /// </summary>
-	public class Spacetime //: ISerializable
+	public class Spacetime
 	{
 		private class RedoEntry
 		{
@@ -71,21 +66,22 @@ namespace Cocktail
 			}
 		}
 
+		// ========== components ===============
+		protected SpacetimeStorage m_storageComponent;
+
         private IHIdFactory m_idFactory;
         private IHTimestamp m_currentTime;
-		protected Dictionary<TStateId, State> m_states;
-		protected Dictionary<TStateId, State> m_nativeStates;
 		private List<RedoEntry> m_RedoList = new List<RedoEntry>();
 		private object m_executionLock = new object();
 		private SortedList<IHEvent, ExecutionFraction> m_incomingExecutions = new SortedList<IHEvent, ExecutionFraction>();
 		private IHEvent m_executingEvent;
 		private bool m_isWaitingForPullRequest = false;
 		protected VMState m_vm;
-		// we use cached state to "pro-act" on an event involves external states optimistically, and let the external ST denies it.
-		private Dictionary<IHId, ExternalSTEntry> m_cachedExternalST = new Dictionary<IHId, ExternalSTEntry>();
 
 		public IHId ID { get { return m_currentTime.ID; } }
 		public IHEvent LatestEvent { get { return m_currentTime.Event; } }
+
+
 
         public Spacetime(IHTimestamp stamp, IHIdFactory idFactory)
 			:this(stamp, idFactory, Enumerable.Empty<State>())
@@ -106,12 +102,16 @@ namespace Cocktail
 		{
 			m_currentTime = stamp;
 			m_idFactory = idFactory;
-			m_states = initialStates.ToDictionary((s) => s.StateId);
-			m_nativeStates = initialStates.ToDictionary((s) => s.StateId);
+			m_vm = new VMState(stamp);
 
 			// every ST must have the minimal VM since the very beginning, VM's life time has no beginning nor an end
-			m_vm = new VMState(stamp);
-			m_states.Add(m_vm.StateId, m_vm);
+			ExternalSTEntry vmST;
+			vmST.IsListeningTo = true;
+			vmST.SpacetimeId = m_vm.SpacetimeID;
+			vmST.LatestUpateTime = HTSFactory.CreateZeroEvent();
+			vmST.LocalStates = Enumerable.Repeat<State>(m_vm, 1).ToDictionary(s => s.StateId);
+
+			m_storageComponent = new SpacetimeStorage(initialStates, Enumerable.Repeat(vmST, 1));
 		}
 
 		public State CreateState(Func<Spacetime, IHTimestamp, State> constructor)
@@ -119,8 +119,7 @@ namespace Cocktail
             var evtOriginal = BeginChronon();
 			var evtFinal = evtOriginal.Advance(ID);
             var newState = constructor(this, m_currentTime);
-			m_states.Add(newState.StateId, newState);
-			m_nativeStates.Add(newState.StateId, newState);
+			m_storageComponent.AddNativeState(newState);
 
 			var redo = new RedoEntry();
 			redo.LocalChanges = new Dictionary<TStateId, StatePatch>();
@@ -132,24 +131,24 @@ namespace Cocktail
             return newState;
         }
 
-		public void Serialize(Stream ostream)
-		{
-			var writer = new BinaryWriter(ostream, Encoding.UTF8);
-			var formatter = new BinaryFormatter();
+		// I don't think we still need it since we have Snapshot()
+		//public void Serialize(Stream ostream)
+		//{
+		//    var writer = new BinaryWriter(ostream, Encoding.UTF8);
+		//    var formatter = new BinaryFormatter();
 
-			lock (m_executionLock)
-			{
-				var curTime = m_currentTime;
-				writer.Write(curTime.ID.ToString());
-				writer.Write(curTime.Event.ToString());
-				writer.Write(m_states.Count);
-				foreach (var state in m_states.Values)
-				{
-					formatter.Serialize(ostream, state);
-				}
-			}
-		}
-
+		//    lock (m_executionLock)
+		//    {
+		//        var curTime = m_currentTime;
+		//        writer.Write(curTime.ID.ToString());
+		//        writer.Write(curTime.Event.ToString());
+		//        writer.Write(m_states.Count);
+		//        foreach (var state in m_states.Values)
+		//        {
+		//            formatter.Serialize(ostream, state);
+		//        }
+		//    }
+		//}
 
 		public SpacetimeSnapshot Snapshot(IHEvent evtAck)
 		{
@@ -157,7 +156,7 @@ namespace Cocktail
 			{
 				return new SpacetimeSnapshot() { 
 					Timestamp = m_currentTime,
-					States = m_states.Values,
+					States = m_storageComponent.GetAllStates(),
 					Redos = m_RedoList.Aggregate(new List<KeyValuePair<TStateId, StatePatch>>(),
 												(accu,entry) =>
 													{
@@ -194,7 +193,8 @@ namespace Cocktail
 		/// </summary>
 		public IEnumerable<Spacetime> SplitForEach()
 		{
-			int count = m_nativeStates.Count;
+			IEnumerable<State> m_nativeStates = m_storageComponent.GetNativeStates();
+			int count = m_nativeStates.Count();
 			if (count <= 1)
 				return new Spacetime[] { this };
 			var ids = m_idFactory.CreateChildren(ID, count);
@@ -203,14 +203,14 @@ namespace Cocktail
 
 			var redo = new RedoEntry();
 
-			var iter = m_nativeStates.Values.GetEnumerator();
+			var iter = m_nativeStates.GetEnumerator();
 			var retval = ids.Select((id) =>
 				{
 					iter.MoveNext();
 					redo.LocalChanges.Add(iter.Current.StateId, StatePatcher.GenerateDestroyPatch(evtFinal, iter.Current.LatestUpdate));
 					return new Spacetime(id, evtFinal, m_idFactory, new State[] { iter.Current });
 				});
-			CommitChronon(evtOriginal, evtFinal, m_nativeStates.Values, redo);
+			CommitChronon(evtOriginal, evtFinal, m_nativeStates, redo);
 			return retval;
 		}
 
@@ -323,7 +323,7 @@ namespace Cocktail
 
 			//---------- collect old snapshot for redo ----------
 
-			var states = stateParams.Select(sp => m_states[sp.Value.StateId]);
+			var states = m_storageComponent.GetAllStates( stateParams.Select(sp => sp.Value.StateId));
 			var oldSnapshots = new List<StateSnapshot>();
 			foreach (var ns in states)
 				oldSnapshots.Add(ns.GetSnapshot());
@@ -385,28 +385,32 @@ namespace Cocktail
 				var patches = fst.OrderBy(patch => patch.FromRev, HTSFactory.GetEventComparer(foreignStamp.ID))
 								.SkipWhile(patch => patch.ToRev.KnownBy(expectingEventCopy)); // we use the expecting event because one event can be sync'ed from 2 sources
 
-				//foreach (var p in patches)
-				//    p.data.Seek(0, SeekOrigin.Begin);
+				var firstPatch = patches.FirstOrDefault();
+				if (firstPatch == null)
+					continue;
 
-				State lst;
-				if (!m_states.TryGetValue(fstateId, out lst))
+				var firstPatchCtx = new StatePatchingCtx(firstPatch);
+
+				var lst = m_storageComponent.GetOrCreate(fstateId, () =>
 				{
-					if (!StatePatcher.TryCreateFromPatch(foreignStamp.ID, fstateId, patches.First(), out lst))
-						throw new ApplicationException(string.Format("State {0} not found in current ST {1} and the first patch is not constructive patch {2}",fstateId, ID, patches.First().Flag ));
-					m_states.Add(fstateId, lst);
-				}
+					State ret;
+					if (!StatePatcher.TryCreateFromPatch(foreignStamp.ID, fstateId, firstPatchCtx, out ret))
+						throw new ApplicationException(string.Format("State {0} not found in current ST {1} and the first patch is not constructive patch {2}", fstateId, ID, patches.First().Flag));
+					return ret;
+				});
 
-				foreach (var patch in patches)
-					if (!lst.Patch(patch))
+				if (!lst.Patch(firstPatchCtx))
+					return false;
+
+				foreach (var patch in patches.Skip(1))
+					if (!lst.Patch(new StatePatchingCtx(patch)))
 						return false;
 
 				newStates.Add(fstateId, lst);
 			}
 
-			ExternalSTEntry entry;
-			entry.LatestUpateTime = foreignStamp;
-			entry.States = newStates;
-			m_cachedExternalST[foreignStamp.ID] = entry;
+			//m_cachedExternalST[foreignStamp.ID] = entry;
+			m_storageComponent.AddSpacetime(foreignStamp, newStates.Values);
 
 			var localTime = HTSFactory.Make(ID, expectingEvent);
 			expectingEvent = localTime.Join(foreignStamp).Event;
@@ -415,7 +419,7 @@ namespace Cocktail
 
 		private void SplitStateParams(IEnumerable<TStateId> stateIds, out IEnumerable<TStateId> natives, out IEnumerable<TStateId> externals)
 		{
-			natives = stateIds.Intersect(m_nativeStates.Keys);
+			natives = stateIds.Intersect(m_storageComponent.GetNativeStates().Select(s => s.StateId));
 			externals = stateIds.Except(natives);
 		}
 
@@ -528,8 +532,8 @@ namespace Cocktail
 			if (!DoPullFrom(vmST.Timestamp, newRedos, ref evtFinal))
 				throw new ApplicationException("Failed to pull from VM Spacetime");
 
-			State vmState;
-			if (!m_states.TryGetValue(vmStateId, out vmState))
+			var vmState = m_storageComponent.GetState(vmStateId);
+			if (vmState == null)
 				throw new ApplicationException("VM Spacetime don't contain the VMState");
 
 			m_vm = (VMState)vmState;

@@ -50,15 +50,19 @@ namespace Cocktail
 		public FieldPatchKind PatchKind;
 	}
 
-	public class StatePatch
+	public class StatePatchMeta
 	{
-		public byte[] m_data;
 		public IHEvent FromRev;
 		public IHEvent ToRev;
 		public StatePatchFlag Flag;
-		public Stream DataStream
+	}
+
+	public class StatePatch : StatePatchMeta
+	{
+		private byte[] m_data;
+		public Stream GetReadStream()
 		{
-			get { return new MemoryStream(m_data); }
+			return new MemoryStream(m_data, false);
 		}
 
 		public StatePatch(StatePatchFlag flag, IHEvent fromRev, IHEvent toRev, byte[] data)
@@ -67,6 +71,18 @@ namespace Cocktail
 			FromRev = fromRev;
 			ToRev = toRev;
 			Flag = flag;
+		}
+	}
+
+	public class StatePatchingCtx
+	{
+		public StatePatchMeta Metadata;
+		public Stream DataStream;
+
+		public StatePatchingCtx(StatePatch patch)
+		{
+			Metadata = patch;
+			DataStream = patch.GetReadStream();
 		}
 	}
 
@@ -219,18 +235,18 @@ namespace Cocktail
 				}
 		}
 
-		public static bool TryCreateFromPatch(IHId hostST, TStateId stateId, StatePatch patch, out State created)
+		public static bool TryCreateFromPatch(IHId hostST, TStateId stateId, StatePatchingCtx patchCtx, out State created)
 		{
-			if (patch.Flag != StatePatchFlag.Create)
+			if (patchCtx.Metadata.Flag != StatePatchFlag.Create)
 			{
 				created = null;
 				return false;
 			}
 
-			var header = new StateCreationHeader(patch.DataStream);
+			var header = new StateCreationHeader(patchCtx.DataStream);
 			var type = Type.GetType(header.AssemblyQualifiedClassName);
 			// newly created state must start from "FromRev"
-			created = (State)Activator.CreateInstance(type, stateId, (Spacetime)null, HTSFactory.Make(hostST, patch.FromRev));
+			created = (State)Activator.CreateInstance(type, stateId, HTSFactory.Make(hostST, patchCtx.Metadata.FromRev));
 			return true;
 		}
 

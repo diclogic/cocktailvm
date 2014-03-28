@@ -126,7 +126,7 @@ namespace Cocktail
 			:base(idFactory.CreateFromRoot(), HTSFactory.CreateZeroEvent(), idFactory)
 		{
 			VMStateId = m_vm.StateId;
-			m_nativeStates.Add(m_vm.StateId, m_vm);
+			m_storageComponent.AddNativeState(m_vm);
 			DOA.NamingSvcClient.Instance.RegisterObject(VMStateId.ToString(),m_vm.GetType().FullName, m_vm);
 		}
 
@@ -134,10 +134,11 @@ namespace Cocktail
 		{
 			VMExecuteArgs(funcName, constArgs);
 		}
+
 		public void VMExecuteArgs(string funcName, IEnumerable<object> constArgs)
 		{
 			ExecuteArgs(funcName
-				, Enumerable.Repeat(new KeyValuePair<string, StateRef>("VM", new LocalStateRef<VMState>(m_vm)), 1)
+				, Utils.MakeArgList("VM", new LocalStateRef<VMState>(m_vm))
 				, constArgs);
 		}
 	}

@@ -51,6 +51,7 @@
     <Compile Include="Cocktail\Interpretor.cs" />
     <Compile Include="Cocktail\Parameter.cs" />
     <Compile Include="Cocktail\SpaceTime.cs" />
+    <Compile Include="Cocktail\SpacetimeStorage.cs" />
     <Compile Include="Cocktail\State.cs" />
     <Compile Include="Cocktail\StatePatching.cs" />
     <Compile Include="Cocktail\StateRef.cs" />
