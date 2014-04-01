@@ -382,8 +382,8 @@ namespace Cocktail
 			foreach (var fst in redos)
 			{
 				var fstateId = fst.Key;
-				var patches = fst.OrderBy(patch => patch.FromRev, HTSFactory.GetEventComparer(foreignStamp.ID))
-								.SkipWhile(patch => patch.ToRev.KnownBy(expectingEventCopy)); // we use the expecting event because one event can be sync'ed from 2 sources
+				var patches = fst.OrderBy(patch => patch.FromEvent, HTSFactory.GetEventComparer(foreignStamp.ID))
+								.SkipWhile(patch => patch.ToEvent.KnownBy(expectingEventCopy)); // we use the expecting event because one event can be sync'ed from 2 sources
 
 				var firstPatch = patches.FirstOrDefault();
 				if (firstPatch == null)
@@ -395,7 +395,7 @@ namespace Cocktail
 				{
 					State ret;
 					if (!StatePatcher.TryCreateFromPatch(foreignStamp.ID, fstateId, firstPatchCtx, out ret))
-						throw new ApplicationException(string.Format("State {0} not found in current ST {1} and the first patch is not constructive patch {2}", fstateId, ID, patches.First().Flag));
+						throw new ApplicationException(string.Format("State {0} not found in current ST {1} and the first patch is not constructive patch: {2}", fstateId, ID, patches.First().Flag));
 					return ret;
 				});
 
@@ -523,8 +523,8 @@ namespace Cocktail
 			var evtOri = BeginChronon();
 			var evtFinal = evtOri;
 
-			var newRedos = vmST.Redos[vmStateId].OrderBy(patch=> patch.ToRev, HTSFactory.GetEventComparer(vmST.Timestamp.ID))
-								.SkipWhile(patch => cmp.Compare(m_currentTime.Event, patch.FromRev) > 0)
+			var newRedos = vmST.Redos[vmStateId].OrderBy(patch=> patch.ToEvent, HTSFactory.GetEventComparer(vmST.Timestamp.ID))
+								.SkipWhile(patch => cmp.Compare(m_currentTime.Event, patch.FromEvent) > 0)
 								.ToLookup(_ => vmStateId);
 			var localRedo = new RedoEntry();
 			localRedo.LocalChanges = new Dictionary<TStateId, StatePatch>();
@@ -548,7 +548,7 @@ namespace Cocktail
 			var evtFinal = evtOri;
 
 			var flatPairs = foreignST.Redos.SelectMany(kgroup => kgroup.Select(elem => new KeyValuePair<TStateId, StatePatch>(kgroup.Key, elem)));
-			var newRedos = flatPairs.Where(kv => cmp.Compare(m_currentTime.Event, kv.Value.FromRev) <= 0)
+			var newRedos = flatPairs.Where(kv => cmp.Compare(m_currentTime.Event, kv.Value.FromEvent) <= 0)
 								.ToLookup(p => p.Key, p => p.Value);
 			var localRedo = new RedoEntry();
 			localRedo.LocalChanges = new Dictionary<TStateId, StatePatch>();

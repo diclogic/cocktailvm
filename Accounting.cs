@@ -7,6 +7,14 @@ using Cocktail;
 
 namespace CollisionTest
 {
+	public interface IAccounting
+	{
+		void Test(Spacetime ST, StateRef account);
+		void Deposit(Spacetime ST, StateRef account, float amount);
+		//void Transfer(Spacetime ST, [State] Account fromAcc, [State] Account toAcc, float amount);
+		//void Withdraw(Spacetime ST, [State] Account account, float amount);
+	}
+
     public static class Accounting
     {
 		public static void Deposit([State] Account account, float amount)

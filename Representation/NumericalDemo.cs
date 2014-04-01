@@ -27,9 +27,18 @@ namespace Representation
 		List<Spacetime> m_spacetimes = new List<Spacetime>();
 		IHIdFactory m_idFactory = HIdService.GetFactory();
 		NamingSvcClient m_namingSvc = NamingSvcClient.Instance;
+		IAccounting m_accounting;
+
 
 		// trival
 		double m_elapsed;
+
+		public NumericalDemo()
+		{
+			var runtimeClass = InvocationBuilder.Build(typeof(IAccounting));
+			m_accounting = Activator.CreateInstance(runtimeClass) as IAccounting;
+			m_accounting.Test(null, null);
+		}
 
 		public void Init(AABB worldBox)
 		{
@@ -77,9 +86,9 @@ namespace Representation
 
 			foreach (var acc in m_accounts)
 			{
-				if (!m_initialST.Execute("Deposit", Utils.MakeArgList("account", new RemoteStateRef(acc.StateId, acc.GetType().ToString())), (float)900))
-					throw new InvalidOperationException();
+				m_accounting.Deposit(m_initialST, new RemoteStateRef(acc.StateId, acc.GetType().ToString()), (float)900);
 			}
+
 			SyncSpacetimes();
 
 			//MakeCollision();

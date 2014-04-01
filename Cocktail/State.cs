@@ -74,6 +74,7 @@ namespace Cocktail
 		public TStateId StateId { get; protected set; }	//< to identify a state
 		public IHId SpacetimeID { get; private set; }
 		public IHEvent LatestUpdate { get; private set; }
+		public long Rev { get; private set; }
 
 		public State(IHTimestamp stamp)
 			: this(stamp, StatePatchMethod.Auto)
@@ -91,6 +92,7 @@ namespace Cocktail
 			SpacetimeID = spacetimeId;
 			LatestUpdate = expectingEvent;
 			m_patchMethod = patchMethod;
+			Rev = 0;
 		}
 
 		//public object Clone()
@@ -105,13 +107,13 @@ namespace Cocktail
 
 		public bool Patch(StatePatchingCtx patchCtx)
 		{
-			return Patch(patchCtx.Metadata.FromRev, patchCtx.Metadata.ToRev, patchCtx.DataStream);
+			return Patch(patchCtx.Metadata.FromEvent, patchCtx.Metadata.ToEvent, patchCtx.Metadata.ToRev, patchCtx.DataStream);
 		}
 
-		public bool Patch(IHEvent fromRev, IHEvent toRev, Stream delta)
+		public bool Patch(IHEvent fromEvent, IHEvent toEvent, long toRev, Stream delta)
 		{
-			if (toRev.KnownBy(LatestUpdate))
-				throw new ApplicationException("Trying to update to an older revision");
+			if (toEvent.KnownBy(LatestUpdate))
+				throw new ApplicationException(string.Format("Trying to update to an older revision. Current {0}, Applying {1}", Rev, toRev));
 
 			if (m_patchMethod == StatePatchMethod.Auto)
 			{
@@ -121,14 +123,17 @@ namespace Cocktail
 				}
 				catch (Exception ex)
 				{
-					Console.WriteLine("Failed to auto-patch state ({0}) from {1} to {2} with exception:\n{3}", StateId, fromRev.ToString(), toRev.ToString(), ex.ToString());
+					Console.WriteLine("Failed to auto-patch state ({0}) from {1} to {2} with exception:\n{3}", StateId, fromEvent.ToString(), toEvent.ToString(), ex.ToString());
 					return false;
 				}
 			}
 			else
 			{
-				return DoPatch(delta);
+				if (!DoPatch(delta))
+					return false;
 			}
+
+			Rev = toRev;
 			return true;
 		}
 		protected virtual bool DoPatch(Stream delta) { return false; }
@@ -180,7 +185,7 @@ namespace Cocktail
 
 		public StateSnapshot GetSnapshot( IHTimestamp overridingTS)
 		{
-			var retval = new StateSnapshot(StateId, GetType().FullName, overridingTS);
+			var retval = new StateSnapshot(StateId, GetType().FullName, overridingTS, Rev);
 
 			if (m_patchMethod == StatePatchMethod.Customized)
 			{
@@ -205,6 +210,7 @@ namespace Cocktail
 		internal void OnCommitting(IHEvent evtFinal)
 		{
 			LatestUpdate = evtFinal;
+			Rev += 1;
 		}
 	}
 }

@@ -52,15 +52,16 @@ namespace Cocktail
 
 	public class StatePatchMeta
 	{
-		public IHEvent FromRev;
-		public IHEvent ToRev;
+		public IHEvent FromEvent;
+		public IHEvent ToEvent;
 		public StatePatchFlag Flag;
+		public long ToRev;
 	}
 
 	public class StatePatch : StatePatchMeta
 	{
 		private byte[] m_data;
-		public Stream GetReadStream()
+		public Stream CreateReadStream()
 		{
 			return new MemoryStream(m_data, false);
 		}
@@ -68,8 +69,8 @@ namespace Cocktail
 		public StatePatch(StatePatchFlag flag, IHEvent fromRev, IHEvent toRev, byte[] data)
 		{
 			m_data = data;
-			FromRev = fromRev;
-			ToRev = toRev;
+			FromEvent = fromRev;
+			ToEvent = toRev;
 			Flag = flag;
 		}
 	}
@@ -82,7 +83,7 @@ namespace Cocktail
 		public StatePatchingCtx(StatePatch patch)
 		{
 			Metadata = patch;
-			DataStream = patch.GetReadStream();
+			DataStream = patch.CreateReadStream();
 		}
 	}
 
@@ -116,14 +117,16 @@ namespace Cocktail
 
 		public TStateId ID;
 		public IHTimestamp Timestamp;
+		public long Rev;
 		public string TypeName;			// basically the field collection is already a mean of type, we keep the type name just for distinguish
 		public List<FieldEntry> Fields = new List<FieldEntry>();
 
-		public StateSnapshot(TStateId id, string typeName, IHTimestamp timestamp)
+		public StateSnapshot(TStateId id, string typeName, IHTimestamp timestamp, long rev)
 		{
 			ID = id;
 			TypeName = typeName;
 			Timestamp = timestamp;
+			Rev = rev;
 		}
 
 	}
@@ -160,7 +163,7 @@ namespace Cocktail
 
 		public static StatePatch GenerateCreatePatch(this StateSnapshot newState, IHEvent originalEvent)
 		{
-			var pseudoOld = new StateSnapshot(newState.ID, newState.TypeName, HTSFactory.Make(newState.Timestamp.ID, originalEvent));
+			var pseudoOld = new StateSnapshot(newState.ID, newState.TypeName, HTSFactory.Make(newState.Timestamp.ID, originalEvent), -1);
 			var ostream = new MemoryStream();
 			StateCreationHeader header;
 			header.AssemblyQualifiedClassName = Assembly.CreateQualifiedName(Assembly.GetAssembly(Type.GetType(newState.TypeName)).FullName, newState.TypeName);
@@ -202,11 +205,12 @@ namespace Cocktail
 			return retval;
 		}
 
-		public static void GeneratePatch(Stream ostream, StateSnapshot newState, IHEvent originalEvent)
-		{
-			var pseudoOld = new StateSnapshot(newState.ID, newState.TypeName, HTSFactory.Make(newState.Timestamp.ID, originalEvent));
-			GeneratePatch(ostream, newState, pseudoOld, null);
-		}
+		// Deprecated
+		//public static void GeneratePatch(Stream ostream, StateSnapshot newState, IHEvent originalEvent)
+		//{
+		//    var pseudoOld = new StateSnapshot(newState.ID, newState.TypeName, HTSFactory.Make(newState.Timestamp.ID, originalEvent));
+		//    GeneratePatch(ostream, newState, pseudoOld, null);
+		//}
 
 		public static void GeneratePatch(Stream ostream, StateSnapshot newState, StateSnapshot oldState, FieldPatchKind? forceKind)
 		{
@@ -246,7 +250,7 @@ namespace Cocktail
 			var header = new StateCreationHeader(patchCtx.DataStream);
 			var type = Type.GetType(header.AssemblyQualifiedClassName);
 			// newly created state must start from "FromRev"
-			created = (State)Activator.CreateInstance(type, stateId, HTSFactory.Make(hostST, patchCtx.Metadata.FromRev));
+			created = (State)Activator.CreateInstance(type, stateId, HTSFactory.Make(hostST, patchCtx.Metadata.FromEvent));
 			return true;
 		}
 

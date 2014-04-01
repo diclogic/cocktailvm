@@ -53,6 +53,11 @@ namespace Cocktail
 				yield return new KeyValuePair<string, StateRef>((string)args[i], (StateRef)args[i + 1]);
 			}
 		}
+
+		public static KeyValuePair<string, StateRef>[] MakeArgArray(params object[] args)
+		{
+			return MakeArgList(args).ToArray();
+		}
 	}
 
     //public class EventProcessor
