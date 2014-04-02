@@ -2,3 +2,5 @@
 tags
 obj/
 bin/
+*.user
+Properties/app.manifest

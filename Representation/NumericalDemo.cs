@@ -27,17 +27,16 @@ namespace Representation
 		List<Spacetime> m_spacetimes = new List<Spacetime>();
 		IHIdFactory m_idFactory = HIdService.GetFactory();
 		NamingSvcClient m_namingSvc = NamingSvcClient.Instance;
-		IAccounting m_accounting;
+		IAccounting m_accountingInvoker;
 
 
-		// trival
+		// trivial
 		double m_elapsed;
 
 		public NumericalDemo()
 		{
 			var runtimeClass = InvocationBuilder.Build(typeof(IAccounting));
-			m_accounting = Activator.CreateInstance(runtimeClass) as IAccounting;
-			m_accounting.Test(null, null);
+			m_accountingInvoker = Activator.CreateInstance(runtimeClass) as IAccounting;
 		}
 
 		public void Init(AABB worldBox)
@@ -71,22 +70,10 @@ namespace Representation
 			m_namingSvc.RegisterObject(newAccount.StateId.ToString(), newAccount.GetType().ToString(), newAccount);
 			m_accounts.Add(newAccount as Account);
 
-			{
-			}
-
-
-			//foreach (var p in m_particles)
-			//{
-			//    kernel.AwareOf("GodPush"
-			//                   , typeof(NewtonPhysics).GetMethod("GodPush")
-			//                   , new Action<Particle, Vector3>(NewtonPhysics.GodPush)
-			//                   , p);
-			//    //kernel.AwareOf("Collide", typeof(NewtonPhysics).GetMethod("Collide"), new Action<Particle,Particle>(NewtonPhysics.Collide) );
-			//}
 
 			foreach (var acc in m_accounts)
 			{
-				m_accounting.Deposit(m_initialST, new RemoteStateRef(acc.StateId, acc.GetType().ToString()), (float)900);
+				m_accountingInvoker.Deposit(m_initialST, GenRemoteRef(acc), 900.0f);
 			}
 
 			SyncSpacetimes();
@@ -106,23 +93,16 @@ namespace Representation
 		{
 			if (m_elapsed > 0.5)
 			{
-				m_initialST.Execute("Transfer"
-					, Utils.MakeArgList( "fromAcc", new LocalStateRef<Account>(m_accounts[0])
-						, "toAcc", GenRemoteRef(m_accounts[1]))
-					, (float)m_rand.Next(50));
+				m_accountingInvoker.Transfer(m_initialST, new LocalStateRef<Account>(m_accounts[0]), GenRemoteRef(m_accounts[1])
+									, (float)m_rand.Next(50));
 				SyncSpacetimes();
 			}
 		}
 
 		private void MakeCollision()
 		{
-			m_initialST.Execute("Withdraw"
-				,Utils.MakeArgList("account", new LocalStateRef<Account>(m_accounts[0]))
-				, 5.0);
-
-			m_secondST.Execute("Transfer"
-				, Utils.MakeArgList("fromAcc", GenRemoteRef(m_accounts[0]), "toAcc", GenRemoteRef(m_accounts[1]))
-				, 7.0);
+			m_accountingInvoker.Withdraw(m_initialST, new LocalStateRef<Account>(m_accounts[0]), 5.0f);
+			m_accountingInvoker.Transfer(m_secondST, GenRemoteRef(m_accounts[0]), GenRemoteRef(m_accounts[1]), 7.0f);
 
 			SyncSpacetimes();
 		}

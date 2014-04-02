@@ -27,15 +27,13 @@ namespace Cocktail
 			typeBuilder.AddInterfaceImplementation(interf);
 
 			// constructor
-			//{
-			//    var ctorBuilder = typeBuilder.DefineConstructor(MethodAttributes.Public, CallingConventions.HasThis, new Type[0]);
-			//    var il = ctorBuilder.GetILGenerator();
-			//    il.Emit(OpCodes.Ret);
-			//}
-			typeBuilder.DefineDefaultConstructor(MethodAttributes.Public);
+			{
+				var ctorBuilder = typeBuilder.DefineConstructor(MethodAttributes.Public, CallingConventions.HasThis, new Type[0]);
+				var il = ctorBuilder.GetILGenerator();
+				il.Emit(OpCodes.Ret);
+			}
 
-
-			// methods implementation
+			// methods
 			foreach (var ifMethod in interf.GetMethods())
 			{
 				//void Deposit(Spacetime ST, StateRef account, float amount)
@@ -44,6 +42,10 @@ namespace Cocktail
 				//}
 
 				var ifMethodParams = ifMethod.GetParameters();
+				var loadArgSpacetime = OpCodes.Ldarg_1;
+
+				if (!typeof(Spacetime).IsAssignableFrom(ifMethodParams.FirstOrDefault().ParameterType))
+					throw new ApplicationException("First param must be `Spacetime' or it's subclasses");
 
 				var methodBuilder = typeBuilder.DefineMethod(
 															ifMethod.Name,
@@ -53,54 +55,69 @@ namespace Cocktail
 															ifMethodParams.Select(mp => mp.ParameterType).ToArray());
 
 				var il = methodBuilder.GetILGenerator();
-				il.UsingNamespace("Cocktail");
+
+				var stateArgPairsType = typeof(IEnumerable<KeyValuePair<string, StateRef>>);
 
 				// local vars
-				//var localCocktailArgs = il.DeclareLocal(typeof(KeyValuePair<string, StateRef>[]));
+				il.DeclareLocal(typeof(object[]));	// varargs
+				var localStateArgs = il.DeclareLocal(stateArgPairsType);
+				var storeVarArgs = OpCodes.Stloc_0;
+				var loadVarArgs = OpCodes.Ldloc_0;
+
 
 				//static Utils.MakeArgList()
 				{
-					int count = 0;
-				    //var argTypes = new List<Type>();
-					foreach (var mp in ifMethodParams)
-					{
-						if (mp.ParameterType == typeof(StateRef))
-						{
-							il.Emit(OpCodes.Ldstr, mp.Name);
-							il.Emit(OpCodes.Ldarg, mp.Position + 1);
-							//argTypes.Add(typeof(string));
-							//argTypes.Add(typeof(StateRef));
-							++count;
-						}
-					}
-					il.Emit(OpCodes.Stelem_Ref);
-					il.Emit(OpCodes.Ldc_I4, count);
-					il.Emit(OpCodes.Newarr, typeof(object));
+					var stateParams = ifMethodParams.Where(x => x.ParameterType == typeof(StateRef));
+					CreateArray(il, stateParams.Count() * 2);	//< 2 elements per arg
+					il.Emit(storeVarArgs);
 
-					var methodMakeArgList = typeof(Utils).GetMethod("MakeArgArray", new[] { typeof(object[]) });
+					int idx = 0;
+					foreach (var sp in stateParams)
+					{
+						il.Emit(loadVarArgs);
+						AddToArray(il, idx, (il2) => il2.Emit(OpCodes.Ldstr, sp.Name));
+						++idx;
+						il.Emit(loadVarArgs);
+						AddToArray(il, idx, (il2) => il2.Emit(OpCodes.Ldarg, sp.Position + 1));
+						++idx;
+					}
+
+					il.Emit(loadVarArgs);
+					var methodMakeArgList = typeof(Utils).GetMethod("MakeArgList", new[] { typeof(object[]) });
 					il.EmitCall(OpCodes.Call, methodMakeArgList, null);
-					il.Emit(OpCodes.Pop);
-					//il.Emit(OpCodes.Stloc, localCocktailArgs);
+					il.Emit(OpCodes.Stloc, localStateArgs);
 				}
 
-				// ST.Execute()
-				//{
-				//    il.Emit(OpCodes.Ldarg_1);
-				//    il.Emit(OpCodes.Ldstr, ifMethod.Name);
-				//    il.Emit(OpCodes.Ldloc, localCocktailArgList);
-				//    //var argTypes = new List<Type>();
-				//    foreach (var cmp in ifMethodParams.Skip(1))	//< TODO: the first param should always be Spacetime
-				//    {
-				//        if (cmp.ParameterType != typeof(StateRef))
-				//        {
-				//            il.Emit(OpCodes.Ldarg, cmp.Position + 1);
-				//            //argTypes.Add(cmp.ParameterType);
-				//        }
-				//    }
-				//    var methodExecute = typeof(Spacetime).GetMethod("Execute");
-				//    il.EmitCall(OpCodes.Call, methodExecute, null);
-				//    il.Emit(OpCodes.Pop);	//< we don't use the return value (for now)
-				//}
+				// ST.Execute(Spacetime, "Deposit", ...
+				// ST.Execute(..., params object[] args)
+				{
+					il.Emit(loadArgSpacetime);
+					il.Emit(OpCodes.Ldstr, ifMethod.Name);
+					il.Emit(OpCodes.Ldloc, localStateArgs);
+
+					var constParams = ifMethodParams.Skip(1).Where(x => x.ParameterType != typeof(StateRef));
+
+					CreateArray(il, constParams.Count());
+					il.Emit(storeVarArgs);
+
+					int idx = 0;
+					foreach (var cp in constParams)
+					{
+						il.Emit(loadVarArgs);
+						AddToArray(il, idx, (il2) =>
+							{
+								il2.Emit(OpCodes.Ldarg, cp.Position + 1);
+								if (cp.ParameterType.IsValueType)
+									il2.Emit(OpCodes.Box, cp.ParameterType);
+							});
+						++idx;
+					}
+
+					il.Emit(loadVarArgs);
+					var methodExecute = typeof(Spacetime).GetMethod("Execute", new[] {typeof(string), stateArgPairsType, typeof(object[])});
+					il.EmitCall(OpCodes.Callvirt, methodExecute, null);
+					il.Emit(OpCodes.Pop);	//< we don't use the return value (for now)
+				}
 
 				il.Emit(OpCodes.Ret);
 			}
@@ -108,9 +125,17 @@ namespace Cocktail
 			return typeBuilder.CreateType();
 		}
 
-		private static void AddToArray()
+		private static void CreateArray(ILGenerator il, int size)
 		{
+			il.Emit(OpCodes.Ldc_I4, size);
+			il.Emit(OpCodes.Newarr, typeof(object));
+		}
 
+		private static void AddToArray(ILGenerator il, int arrIdx, Action<ILGenerator> pushObjFunc)
+		{
+			il.Emit(OpCodes.Ldc_I4, arrIdx);
+			pushObjFunc(il);
+			il.Emit(OpCodes.Stelem_Ref);
 		}
 
 		private static ModuleBuilder CreateModule(Type interf)
