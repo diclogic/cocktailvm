@@ -13,10 +13,11 @@ namespace Cocktail
 {
 	public static class InvocationBuilder
 	{
-		public static Type Build( Type interf)
+		public static Type Build(Type interf)
 		{
-			// checking
-			CheckInterface(interf);
+			// must be interface
+			if (!interf.IsInterface)
+				throw new JITCompileException(String.Format("Can't create invocation, the type must be an interface: {0}", interf.FullName));
 
 			// module creation
 			var module = CreateModule(interf);
@@ -45,7 +46,7 @@ namespace Cocktail
 				var loadArgSpacetime = OpCodes.Ldarg_1;
 
 				if (!typeof(Spacetime).IsAssignableFrom(ifMethodParams.FirstOrDefault().ParameterType))
-					throw new ApplicationException("First param must be `Spacetime' or it's subclasses");
+					throw new JITCompileException("First param must be `Spacetime' or it's subclasses");
 
 				var methodBuilder = typeBuilder.DefineMethod(
 															ifMethod.Name,
@@ -58,31 +59,28 @@ namespace Cocktail
 
 				var stateArgPairsType = typeof(IEnumerable<KeyValuePair<string, StateRef>>);
 
-				// local vars
-				il.DeclareLocal(typeof(object[]));	// varargs
+				// local variables
+				var localVarargs = il.DeclareLocal(typeof(object[]));	// varargs
 				var localStateArgs = il.DeclareLocal(stateArgPairsType);
-				var storeVarArgs = OpCodes.Stloc_0;
-				var loadVarArgs = OpCodes.Ldloc_0;
-
 
 				//static Utils.MakeArgList()
 				{
 					var stateParams = ifMethodParams.Where(x => x.ParameterType == typeof(StateRef));
-					CreateArray(il, stateParams.Count() * 2);	//< 2 elements per arg
-					il.Emit(storeVarArgs);
+					if (stateParams.FirstOrDefault() == null)
+						throw new JITCompileException(string.Format("Each method must have at least one state. Method name:", ifMethod.Name));
+
+					CreateArray(il, localVarargs, stateParams.Count() * 2);	//< 2 elements per arg
 
 					int idx = 0;
 					foreach (var sp in stateParams)
 					{
-						il.Emit(loadVarArgs);
-						AddToArray(il, idx, (il2) => il2.Emit(OpCodes.Ldstr, sp.Name));
+						AddToArray(il, localVarargs, idx, (il2) => il2.Emit(OpCodes.Ldstr, sp.Name));
 						++idx;
-						il.Emit(loadVarArgs);
-						AddToArray(il, idx, (il2) => il2.Emit(OpCodes.Ldarg, sp.Position + 1));
+						AddToArray(il, localVarargs, idx, (il2) => il2.Emit(OpCodes.Ldarg, sp.Position + 1));
 						++idx;
 					}
 
-					il.Emit(loadVarArgs);
+					il.Emit(OpCodes.Ldloc, localVarargs);
 					var methodMakeArgList = typeof(Utils).GetMethod("MakeArgList", new[] { typeof(object[]) });
 					il.EmitCall(OpCodes.Call, methodMakeArgList, null);
 					il.Emit(OpCodes.Stloc, localStateArgs);
@@ -97,14 +95,12 @@ namespace Cocktail
 
 					var constParams = ifMethodParams.Skip(1).Where(x => x.ParameterType != typeof(StateRef));
 
-					CreateArray(il, constParams.Count());
-					il.Emit(storeVarArgs);
+					CreateArray(il, localVarargs, constParams.Count());
 
 					int idx = 0;
 					foreach (var cp in constParams)
 					{
-						il.Emit(loadVarArgs);
-						AddToArray(il, idx, (il2) =>
+						AddToArray(il, localVarargs, idx, (il2) =>
 							{
 								il2.Emit(OpCodes.Ldarg, cp.Position + 1);
 								if (cp.ParameterType.IsValueType)
@@ -113,7 +109,7 @@ namespace Cocktail
 						++idx;
 					}
 
-					il.Emit(loadVarArgs);
+					il.Emit(OpCodes.Ldloc, localVarargs);
 					var methodExecute = typeof(Spacetime).GetMethod("Execute", new[] {typeof(string), stateArgPairsType, typeof(object[])});
 					il.EmitCall(OpCodes.Callvirt, methodExecute, null);
 					il.Emit(OpCodes.Pop);	//< we don't use the return value (for now)
@@ -125,14 +121,16 @@ namespace Cocktail
 			return typeBuilder.CreateType();
 		}
 
-		private static void CreateArray(ILGenerator il, int size)
+		private static void CreateArray(ILGenerator il, LocalBuilder arr, int size)
 		{
 			il.Emit(OpCodes.Ldc_I4, size);
 			il.Emit(OpCodes.Newarr, typeof(object));
+			il.Emit(OpCodes.Stloc, arr);
 		}
 
-		private static void AddToArray(ILGenerator il, int arrIdx, Action<ILGenerator> pushObjFunc)
+		private static void AddToArray(ILGenerator il, LocalBuilder arr, int arrIdx, Action<ILGenerator> pushObjFunc)
 		{
+			il.Emit(OpCodes.Ldloc, arr);
 			il.Emit(OpCodes.Ldc_I4, arrIdx);
 			pushObjFunc(il);
 			il.Emit(OpCodes.Stelem_Ref);
@@ -143,14 +141,6 @@ namespace Cocktail
 			var assemblyName = new AssemblyName("InmemoryInvocation_" + interf.Name);
 			var assembly = AppDomain.CurrentDomain.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.Run);
 			return assembly.DefineDynamicModule("InmemoryInvocation_"+interf.Name, true);
-		}
-
-		private static void CheckInterface(Type interf)
-		{
-			if (!interf.IsInterface)
-			{
-				throw new ArgumentException(String.Format("Can't create log service for type {0}", interf), "_interface");
-			}
 		}
 	}
 }

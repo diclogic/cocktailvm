@@ -123,6 +123,11 @@ namespace Cocktail
         public CompileTimeException(string reason) : base(reason) { }
     }
 
+	public class JITCompileException : ApplicationException
+	{
+		public JITCompileException(string reason) : base(reason) { }
+	}
+
 	public class RuntimeException : ApplicationException
 	{
         public RuntimeException(string reason) : base(reason) { }
