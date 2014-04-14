@@ -81,7 +81,7 @@ namespace Cocktail
 					}
 
 					il.Emit(OpCodes.Ldloc, localVarargs);
-					var methodMakeArgList = typeof(Utils).GetMethod("MakeArgList", new[] { typeof(object[]) });
+					var methodMakeArgList = typeof(InterpUtils).GetMethod("MakeArgList", new[] { typeof(object[]) });
 					il.EmitCall(OpCodes.Call, methodMakeArgList, null);
 					il.Emit(OpCodes.Stloc, localStateArgs);
 				}

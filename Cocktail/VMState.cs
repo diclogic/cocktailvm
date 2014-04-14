@@ -138,7 +138,7 @@ namespace Cocktail
 		public void VMExecuteArgs(string funcName, IEnumerable<object> constArgs)
 		{
 			ExecuteArgs(funcName
-				, Utils.MakeArgList("VM", new LocalStateRef<VMState>(m_vm))
+				, InterpUtils.MakeArgList("VM", new LocalStateRef<VMState>(m_vm))
 				, constArgs);
 		}
 	}

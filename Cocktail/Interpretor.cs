@@ -44,7 +44,7 @@ namespace Cocktail
 		//public TimeStamp timestamp;
 	}
 
-	public static class Utils
+	public static class InterpUtils
 	{
 		public static IEnumerable<KeyValuePair<string, StateRef>> MakeArgList(params object[] args)
 		{

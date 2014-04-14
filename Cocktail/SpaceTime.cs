@@ -32,6 +32,31 @@ namespace Cocktail
 		public IHTimestamp Timestamp;
 		public IEnumerable<State> States;
 		public ILookup<TStateId, StatePatch> Redos;
+
+		public IEnumerable<KeyValuePair<TStateId, IHEvent>> LatestEvents
+		{
+			get
+			{
+				foreach (var state in Redos)
+					yield return new KeyValuePair<TStateId, IHEvent>( state.Key,
+						state.Aggregate(HTSFactory.CreateZeroEvent(),
+										(acc, patch) => acc.KnownBy(patch.ToEvent) ? patch.ToEvent : acc)
+						);
+			}
+		}
+	}
+
+	public static class SpacetimeUtils
+	{
+		public Dictionary<TStateId,IHEvent> ReduceLatestStateEvents(IEnumerable<KeyValuePair<TStateId, IHEvent>> input)
+		{
+			var retval = new Dictionary<TStateId,IHEvent>();
+			input.ToLookup(kv => kv.Key, kv=>kv.Value).Aggregate(new KeyValuePair<TStateId, IHEvent>(kv.Key), (acc, kv) =>
+				{
+
+				});
+
+		}
 	}
 
 	public enum PrePullResult
@@ -54,13 +79,16 @@ namespace Cocktail
 		{
 			public IHEvent Rev;
 			public IEnumerable<IHId> AffectedFSTs;
-			public IDictionary<TStateId, StatePatch> LocalChanges;
+			public IEnumerable<KeyValuePair<TStateId, IHEvent>> IntegratedStates;
+			public IDictionary<TStateId, StatePatch> LocalChanges;	// Local changes means things we changed locally, not just for local states
 
+			// TODO: define what it does
 			RedoEntry Filter(IEnumerable<IHId> STs, IDictionary<TStateId,IHId> dict)
 			{
 				var retval = new RedoEntry();
 				retval.Rev = this.Rev;
 				retval.AffectedFSTs = this.AffectedFSTs.Where(val => STs.Contains(val));
+				retval.IntegratedStates = this.IntegratedStates.ToArray();
 				retval.LocalChanges = this.LocalChanges.Where(kv => STs.Contains(dict[kv.Key])).ToDictionary(kv => kv.Key, kv => kv.Value);
 				return retval;
 			}
@@ -269,6 +297,7 @@ namespace Cocktail
 			IHEvent evtOriginal, evtFinal;
 			while ((evtOriginal = BeginChronon()) == null) ;
 			evtFinal = evtOriginal;
+			var redo = new RedoEntry();
 
 			IEnumerable<TStateId> nativeIds, foreignIds;
 			SplitStateParams(stateParams.Select((sp) => sp.Value.StateId), out nativeIds, out foreignIds);
@@ -319,6 +348,18 @@ namespace Cocktail
 					AbortChronon();
 					return false;
 				}
+
+				var stateStamps = new Dictionary<TStateId, IHEvent>();
+				foreach (var st in foreignSTs)
+				{
+					foreach (var state in st.Value.LatestEvents)
+					{
+						if (stateStamps.ContainsKey(state.Key) && !stateStamps[state.Key].KnownBy(state.Value))
+							continue;
+
+						stateStamps[state.Key] = state.Value;
+					}
+				}
 			}
 
 			//---------- collect old snapshot for redo ----------
@@ -336,7 +377,6 @@ namespace Cocktail
 
 			//----- make redo -------
 
-			var redo = new RedoEntry();
 			redo.AffectedFSTs = foreignSTIds.ToList();
 			redo.LocalChanges = new Dictionary<TStateId, StatePatch>();
 
