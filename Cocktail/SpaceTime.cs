@@ -48,14 +48,9 @@ namespace Cocktail
 
 	public static class SpacetimeUtils
 	{
-		public Dictionary<TStateId,IHEvent> ReduceLatestStateEvents(IEnumerable<KeyValuePair<TStateId, IHEvent>> input)
+		public static ILookup<TStateId,IHEvent> ReduceLatestStateEvents(IEnumerable<KeyValuePair<TStateId, IHEvent>> input)
 		{
-			var retval = new Dictionary<TStateId,IHEvent>();
-			input.ToLookup(kv => kv.Key, kv=>kv.Value).Aggregate(new KeyValuePair<TStateId, IHEvent>(kv.Key), (acc, kv) =>
-				{
-
-				});
-
+			return input.ToLookup(kv => kv.Key, kv=>kv.Value);
 		}
 	}
 

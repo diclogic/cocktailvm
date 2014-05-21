@@ -22,8 +22,8 @@ namespace Cocktail
 		None = 0,
 		CommutativeDelta = 0x1,
 		Delta = 0x2,
-		CommutativeReplace = 0x4,	// for mutable data
-		Replace = 0x8,
+		CommutativeSwap = 0x4,	// for mutable data
+		Swap = 0x8,
 		All = 0xFFff,
 	}
 
@@ -34,14 +34,16 @@ namespace Cocktail
 		CreateBit = 0x1,
 		DestroyBit = 0x2,
 		CommutativeBit = 0x4,
-		ReplaceBit = 0x8,
+		SwapBit = 0x8,		//< update by replacing
+		DistributedBit = 0x10,
 
-		Create = CreateBit | ReplaceBit,
+		Create = CreateBit | SwapBit,
 		OrderedDelta = 0,
 		CommutativeDelta = CommutativeBit,
-		OrderedReplace = ReplaceBit,
-		CommutativeReplace = ReplaceBit | CommutativeBit,
-		Destroy = DestroyBit | ReplaceBit,
+		DistributedCommutativeDelta = DistributedBit | CommutativeBit,
+		OrderedSwap = SwapBit,
+		CommutativeSwap = SwapBit | CommutativeBit,
+		Destroy = DestroyBit | SwapBit,
 	}
 
 	[Serializable]
@@ -168,7 +170,7 @@ namespace Cocktail
 			StateCreationHeader header;
 			header.AssemblyQualifiedClassName = Assembly.CreateQualifiedName(Assembly.GetAssembly(Type.GetType(newState.TypeName)).FullName, newState.TypeName);
 			header.Write(ostream);
-			GeneratePatch(ostream, newState, pseudoOld, FieldPatchKind.Replace);
+			GeneratePatch(ostream, newState, pseudoOld, FieldPatchKind.Swap);
 
 			var retval = new StatePatch(StatePatchFlag.Create, pseudoOld.Timestamp.Event,
 										 newState.Timestamp.Event,
@@ -185,11 +187,11 @@ namespace Cocktail
 		{
 			return fieldPatchKinds.Aggregate(StatePatchFlag.None,(accu, elem) =>
 				{
-				if (0 != (elem & (FieldPatchKind.CommutativeDelta | FieldPatchKind.CommutativeReplace)))
+				if (0 != (elem & (FieldPatchKind.CommutativeDelta | FieldPatchKind.CommutativeSwap)))
 					accu |= StatePatchFlag.CommutativeBit;
 
-				if (0 != (elem & (FieldPatchKind.Replace | FieldPatchKind.CommutativeReplace)))
-					accu |= StatePatchFlag.ReplaceBit;
+				if (0 != (elem & (FieldPatchKind.Swap | FieldPatchKind.CommutativeSwap)))
+					accu |= StatePatchFlag.SwapBit;
 				return accu;
 				});
 		}
@@ -267,8 +269,8 @@ namespace Cocktail
 						func(writer, fpair.newVal, fpair.oldVal);
 					}
 					break;
-				case FieldPatchKind.CommutativeReplace:
-				case FieldPatchKind.Replace:
+				case FieldPatchKind.CommutativeSwap:
+				case FieldPatchKind.Swap:
 					{
 						Action<BinaryWriter, object> func;
 						if (!m_fieldSerializers.TryGetValue(fpair.Type, out func))
@@ -297,8 +299,8 @@ namespace Cocktail
 						func(reader, fi, host);
 					}
 					break;
-				case FieldPatchKind.CommutativeReplace:
-				case FieldPatchKind.Replace:
+				case FieldPatchKind.CommutativeSwap:
+				case FieldPatchKind.Swap:
 					{
 						Action<BinaryReader, FieldInfo, object> func;
 						if (!m_fieldDiffDeserializers.TryGetValue(fi.FieldType, out func))
