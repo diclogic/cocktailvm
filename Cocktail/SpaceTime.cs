@@ -147,8 +147,12 @@ namespace Cocktail
 			var redo = new RedoEntry();
 			redo.LocalChanges = new Dictionary<TStateId, StatePatch>();
 
-			var patch = newState.GetSnapshot(evtFinal).GenerateCreatePatch(m_currentTime.Event);
-			redo.LocalChanges.Add(newState.StateId, patch);
+			// do create and destroy only for non-commutatives
+			if (0 == (newState.GetPatchFlag() & PatchFlag.CommutativeBit))
+			{
+				var patch = newState.GetSnapshot(evtFinal).GenerateCreatePatch(m_currentTime.Event);
+				redo.LocalChanges.Add(newState.StateId, patch);
+			}
 
 			CommitChronon(evtOriginal, evtFinal, Enumerable.Repeat(newState, 1), redo);
             return newState;
@@ -230,7 +234,7 @@ namespace Cocktail
 			var retval = ids.Select((id) =>
 				{
 					iter.MoveNext();
-					redo.LocalChanges.Add(iter.Current.StateId, StatePatcher.GenerateDestroyPatch(evtFinal, iter.Current.LatestUpdate));
+					redo.LocalChanges.Add(iter.Current.StateId, StatePatchUtils.GenerateDestroyPatch(evtFinal, iter.Current.LatestUpdate));
 					return new Spacetime(id, evtFinal, m_idFactory, new State[] { iter.Current });
 				});
 			CommitChronon(evtOriginal, evtFinal, m_nativeStates, redo);
@@ -319,7 +323,7 @@ namespace Cocktail
 						var state = foreignSTs[sp.Key].States.FirstOrDefault(s => s.StateId.Equals(sp.Value));
 						if (state == null)
 							throw new ApplicationException("No such state in foreign Spacetime and creating state into external ST is not allowed");
-						return (0 == (state.GetPatchFlag() & StatePatchFlag.CommutativeBit));
+						return (0 == (state.GetPatchFlag() & PatchFlag.CommutativeBit));
 					}).GroupBy(kv => kv.Key, kv => kv.Value);
 
 				// because we know who is involved, we can give headsup to them beforehand
@@ -424,12 +428,13 @@ namespace Cocktail
 				if (firstPatch == null)
 					continue;
 
+				// Treat first patch differently because we use it to locate the state obj (or create one)
 				var firstPatchCtx = new StatePatchingCtx(firstPatch);
 
 				var lst = m_storageComponent.GetOrCreate(fstateId, () =>
 				{
 					State ret;
-					if (!StatePatcher.TryCreateFromPatch(foreignStamp.ID, fstateId, firstPatchCtx, out ret))
+					if (!StatePatchUtils.TryCreateFromPatch(foreignStamp.ID, fstateId, firstPatchCtx, out ret))
 						throw new ApplicationException(string.Format("State {0} not found in current ST {1} and the first patch is not constructive patch: {2}", fstateId, ID, patches.First().Flag));
 					return ret;
 				});

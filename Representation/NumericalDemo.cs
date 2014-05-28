@@ -29,14 +29,12 @@ namespace Representation
 		NamingSvcClient m_namingSvc = NamingSvcClient.Instance;
 		IAccounting m_accountingInvoker;
 
-
 		// trivial
 		double m_elapsed;
 
 		public NumericalDemo()
 		{
-			var runtimeClass = InvocationBuilder.Build(typeof(IAccounting));
-			m_accountingInvoker = Activator.CreateInstance(runtimeClass) as IAccounting;
+			m_accountingInvoker = InvocationBuilder.Build<IAccounting>();
 		}
 
 		public void Init(AABB worldBox)
@@ -45,9 +43,8 @@ namespace Representation
 
 			m_vmST = new VMSpacetime(m_idFactory);
 			// declare a function form for an event, which also means binding an event to one or a few state types
-			m_vmST.VMExecute("Cocktail.DeclareAndLink", "Deposit", typeof(Accounting).GetMethod("Deposit"));
-			m_vmST.VMExecute("Cocktail.DeclareAndLink", "Transfer", typeof(Accounting).GetMethod("Transfer"));
-			m_vmST.VMExecute("Cocktail.DeclareAndLink", "Withdraw", typeof(Accounting).GetMethod("Withdraw"));
+			m_vmST.VMBind(typeof(IAccounting), typeof(Accounting));
+
 			//kernel.Declare("CreateAccount", FunctionForm.From(typeof(Accounting).GetMethod("CreateAccount")));
 			PseudoSyncMgr.Instance.Initialize(m_vmST);
 

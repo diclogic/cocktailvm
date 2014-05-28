@@ -13,14 +13,21 @@ namespace Cocktail
 {
 	public static class InvocationBuilder
 	{
-		public static Type Build(Type interf)
+		public static T Build<T>()
+			where T: class
+		{
+			var implType = BuildType(typeof(T));
+			return Activator.CreateInstance(implType) as T;
+		}
+
+		public static Type BuildType(Type interf)
 		{
 			// must be interface
 			if (!interf.IsInterface)
 				throw new JITCompileException(String.Format("Can't create invocation, the type must be an interface: {0}", interf.FullName));
 
 			// module creation
-			var module = CreateModule(interf);
+			var module = CreateModule("CocktailInvoker_"+interf.Name);
 
 			// type definition
 			var typeName = string.Format("Proxy_{0}", interf.Name);
@@ -136,11 +143,11 @@ namespace Cocktail
 			il.Emit(OpCodes.Stelem_Ref);
 		}
 
-		private static ModuleBuilder CreateModule(Type interf)
+		private static ModuleBuilder CreateModule(string moduleName)
 		{
-			var assemblyName = new AssemblyName("InmemoryInvocation_" + interf.Name);
+			var assemblyName = new AssemblyName(moduleName);
 			var assembly = AppDomain.CurrentDomain.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.Run);
-			return assembly.DefineDynamicModule("InmemoryInvocation_"+interf.Name, true);
+			return assembly.DefineDynamicModule(moduleName, true);
 		}
 	}
 }

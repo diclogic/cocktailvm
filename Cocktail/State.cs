@@ -119,7 +119,7 @@ namespace Cocktail
 			{
 				try
 				{
-					StatePatcher.PatchState(delta, this);
+					StatePatchUtils.PatchState(delta, this);
 				}
 				catch (Exception ex)
 				{
@@ -138,8 +138,8 @@ namespace Cocktail
 		}
 		protected virtual bool DoPatch(Stream delta) { return false; }
 
-		public IEnumerable<FieldInfo> GetFields() { return GetFields(FieldPatchKind.All); }
-		public IEnumerable<FieldInfo> GetFields(FieldPatchKind kinds)
+		public IEnumerable<FieldInfo> GetFields() { return GetFields(FieldPatchCompatibility.All); }
+		public IEnumerable<FieldInfo> GetFields(FieldPatchCompatibility kinds)
 		{
 			var fields = GetType().GetFields(BindingFlags.Instance | BindingFlags.DeclaredOnly | BindingFlags.Public | BindingFlags.NonPublic);
 			return fields.Where(fi =>
@@ -166,7 +166,7 @@ namespace Cocktail
 		{
 			if (m_patchMethod == StatePatchMethod.Auto)
 			{
-				StatePatcher.GeneratePatch(ostream, this.GetSnapshot(), oldSnapshot, null);
+				StatePatchUtils.GeneratePatch(ostream, this.GetSnapshot(), oldSnapshot, null);
 			}
 			else
 			{

@@ -11,7 +11,7 @@ namespace CollisionTest.States
     [State]
     public class Account : State
     {
-		[StateField(PatchKind=FieldPatchKind.CommutativeDelta)]
+		[StateField(PatchKind = FieldPatchCompatibility.CommutativeDelta)]
 		public float Balance;
 
         public Account( IHTimestamp stamp) : base(stamp) { }

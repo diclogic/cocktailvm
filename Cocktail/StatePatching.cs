@@ -17,18 +17,17 @@ namespace Cocktail
 	}
 
 	[Flags]
-	public enum FieldPatchKind : ushort
+	public enum FieldPatchCompatibility : ushort
 	{
-		None = 0,
+		Invalid = 0,
 		CommutativeDelta = 0x1,
-		Delta = 0x2,
-		CommutativeSwap = 0x4,	// for mutable data
-		Swap = 0x8,
+		CommutativeSwap = 0x2,	// for mutable data
+		Swap = 0x4,
 		All = 0xFFff,
 	}
 
 	[Flags]
-	public enum StatePatchFlag : ushort
+	public enum PatchFlag : ushort
 	{
 		None = 0,
 		CreateBit = 0x1,
@@ -37,30 +36,30 @@ namespace Cocktail
 		SwapBit = 0x8,		//< update by replacing
 		DistributedBit = 0x10,
 
-		Create = CreateBit | SwapBit,
-		OrderedDelta = 0,
-		CommutativeDelta = CommutativeBit,
-		DistributedCommutativeDelta = DistributedBit | CommutativeBit,
-		OrderedSwap = SwapBit,
-		CommutativeSwap = SwapBit | CommutativeBit,
-		Destroy = DestroyBit | SwapBit,
+		Invalid = 0,	//< it also means Ordered Delta but that's a useless case
+		Create = PatchFlag.CreateBit | PatchFlag.SwapBit,
+		CommutativeDelta = PatchFlag.CommutativeBit,
+		DistributedCommutativeDelta = PatchFlag.DistributedBit | PatchFlag.CommutativeBit,
+		OrderedSwap = PatchFlag.SwapBit,
+		CommutativeSwap = PatchFlag.SwapBit | PatchFlag.CommutativeBit,
+		Destroy = PatchFlag.DestroyBit | PatchFlag.SwapBit,
 	}
 
 	[Serializable]
 	public class StateFieldAttribute : Attribute
 	{
-		public FieldPatchKind PatchKind;
+		public FieldPatchCompatibility PatchKind;
 	}
 
-	public class StatePatchMeta
+	public class MetaStatePatch
 	{
 		public IHEvent FromEvent;
 		public IHEvent ToEvent;
-		public StatePatchFlag Flag;
+		public PatchFlag Flag;
 		public long ToRev;
 	}
 
-	public class StatePatch : StatePatchMeta
+	public class StatePatch : MetaStatePatch
 	{
 		private byte[] m_data;
 		public Stream CreateReadStream()
@@ -68,7 +67,7 @@ namespace Cocktail
 			return new MemoryStream(m_data, false);
 		}
 
-		public StatePatch(StatePatchFlag flag, IHEvent fromRev, IHEvent toRev, byte[] data)
+		public StatePatch(PatchFlag flag, IHEvent fromRev, IHEvent toRev, byte[] data)
 		{
 			m_data = data;
 			FromEvent = fromRev;
@@ -79,7 +78,7 @@ namespace Cocktail
 
 	public class StatePatchingCtx
 	{
-		public StatePatchMeta Metadata;
+		public MetaStatePatch Metadata;
 		public Stream DataStream;
 
 		public StatePatchingCtx(StatePatch patch)
@@ -94,13 +93,19 @@ namespace Cocktail
 	{
 		public string AssemblyQualifiedClassName;
 
+		public StateCreationHeader(Type stateType)
+		{
+			AssemblyQualifiedClassName = 
+				Assembly.CreateQualifiedName(Assembly.GetAssembly(stateType).FullName, stateType.FullName);
+		}
+
 		public StateCreationHeader(Stream istream)
 		{
 			var reader = new BinaryReader(istream);
 			AssemblyQualifiedClassName = reader.ReadString();
 		}
 
-		public void Write(Stream ostream)
+		public void WriteTo(Stream ostream)
 		{
 			var writer = new BinaryWriter(ostream);
 			writer.Write(AssemblyQualifiedClassName);
@@ -136,17 +141,22 @@ namespace Cocktail
 	public static class StatePatchingExtension
 	{
 
-		public static StatePatchFlag GetPatchFlag(this State lhs)
+		public static PatchFlag GetPatchFlag(this State lhs)
 		{
 			if (lhs == null)
-				return StatePatchFlag.None;
+				return PatchFlag.Invalid;
 
 			var fieldPatchKinds = lhs.GetFields().Select(fi => ((StateFieldAttribute)fi.GetCustomAttributes(typeof(StateFieldAttribute), false).FirstOrDefault()).PatchKind);
-			return StatePatcher.GetPatchFlag(fieldPatchKinds);
+			return StatePatchUtils.FindPatchMethod(fieldPatchKinds);
 		}
 	}
 
-	public static class StatePatcher
+	public class PatchException : RuntimeException
+	{
+		public PatchException(string reason) :base(reason) { }
+	}
+
+	public static class StatePatchUtils
 	{
 		private struct FieldPair
 		{
@@ -159,48 +169,90 @@ namespace Cocktail
 
 		public static StatePatch GenerateDestroyPatch(IHEvent expectingEvent, IHEvent oriEvent)
 		{
-			var retval = new StatePatch(StatePatchFlag.Destroy, oriEvent, expectingEvent, new byte[0]);
+			var retval = new StatePatch(PatchFlag.Destroy, oriEvent, expectingEvent, new byte[0]);
 			return retval;
 		}
 
 		public static StatePatch GenerateCreatePatch(this StateSnapshot newState, IHEvent originalEvent)
 		{
+			var flag = newState.FindPatchMethod() | PatchFlag.Create;
+
 			var pseudoOld = new StateSnapshot(newState.ID, newState.TypeName, HTSFactory.Make(newState.Timestamp.ID, originalEvent), -1);
 			var ostream = new MemoryStream();
-			StateCreationHeader header;
-			header.AssemblyQualifiedClassName = Assembly.CreateQualifiedName(Assembly.GetAssembly(Type.GetType(newState.TypeName)).FullName, newState.TypeName);
-			header.Write(ostream);
-			GeneratePatch(ostream, newState, pseudoOld, FieldPatchKind.Swap);
+			GeneratePatch(ostream, newState, pseudoOld, flag);
 
-			var retval = new StatePatch(StatePatchFlag.Create, pseudoOld.Timestamp.Event,
+			var retval = new StatePatch(flag, pseudoOld.Timestamp.Event,
 										 newState.Timestamp.Event,
 										 ostream.ToArray());
 			return retval;
 		}
 
-		public static StatePatchFlag GetPatchFlag(this StateSnapshot snapshot)
+		public static bool TryCreateFromPatch(IHId hostST, TStateId stateId, StatePatchingCtx patchCtx, out State created)
 		{
-			return GetPatchFlag(snapshot.Fields.Select(field => field.Attrib.PatchKind));
+			// nothing to create
+			if (0 == (patchCtx.Metadata.Flag & (PatchFlag.CreateBit | PatchFlag.CommutativeBit)))
+			{
+				created = null;
+				return false;
+			}
+
+			var header = new StateCreationHeader(patchCtx.DataStream);
+			var type = Type.GetType(header.AssemblyQualifiedClassName);
+			// newly created state must start from "FromRev"
+			created = (State)Activator.CreateInstance(type, stateId, HTSFactory.Make(hostST, patchCtx.Metadata.FromEvent));
+			return true;
 		}
 
-		public static StatePatchFlag GetPatchFlag(IEnumerable<FieldPatchKind> fieldPatchKinds)
+		public static PatchFlag FindPatchMethod(this StateSnapshot snapshot)
 		{
-			return fieldPatchKinds.Aggregate(StatePatchFlag.None,(accu, elem) =>
+			return FindPatchMethod(snapshot.Fields.Select(field => field.Attrib.PatchKind));
+		}
+
+		public static PatchFlag FindPatchMethod(IEnumerable<FieldPatchCompatibility> fieldPatchKinds)
+		{
+			var actionBits = fieldPatchKinds.Aggregate(PatchFlag.None, (accu, elem) =>
 				{
-				if (0 != (elem & (FieldPatchKind.CommutativeDelta | FieldPatchKind.CommutativeSwap)))
-					accu |= StatePatchFlag.CommutativeBit;
+					// if anything is non-commutative, the state is non-commutative
+					if (0 == (elem & (FieldPatchCompatibility.CommutativeDelta | FieldPatchCompatibility.CommutativeSwap)))
+					{
+						accu |= PatchFlag.CommutativeBit;
+					}
 
-				if (0 != (elem & (FieldPatchKind.Swap | FieldPatchKind.CommutativeSwap)))
-					accu |= StatePatchFlag.SwapBit;
-				return accu;
+					// if anything is swap, then it's a swap
+					if (0 != (elem & (FieldPatchCompatibility.Swap | FieldPatchCompatibility.CommutativeSwap)))
+					{
+						accu |= PatchFlag.SwapBit;
+					}
+					return accu;
 				});
+
+			return (PatchFlag)actionBits;
 		}
 
-		public static StatePatch GeneratePatch(this StateSnapshot newState, StateSnapshot oldState, FieldPatchKind? forceKind)
+		// not needed
+		public static FieldPatchCompatibility CalcFieldPatchMethod(PatchFlag stateFlag, FieldPatchCompatibility patchKind)
 		{
+			if (0 == (stateFlag & PatchFlag.CommutativeBit))
+			{
+				patchKind &= ~FieldPatchCompatibility.CommutativeDelta;
+				patchKind &= ~FieldPatchCompatibility.CommutativeSwap;
+			}
+
+			if (0 != (stateFlag & PatchFlag.SwapBit))
+			{
+				patchKind &= ~FieldPatchCompatibility.CommutativeDelta;
+			}
+
+			return patchKind;
+		}
+
+		public static StatePatch GeneratePatch(this StateSnapshot newState, StateSnapshot oldState, PatchFlag? overridingFlag)
+		{
+			var flag = overridingFlag.HasValue ? overridingFlag.Value : newState.FindPatchMethod();
+
 			var ostream = new MemoryStream();
-			GeneratePatch(ostream, newState, oldState, forceKind);
-			var retval = new StatePatch( GetPatchFlag(newState),
+			GeneratePatch(ostream, newState, oldState, flag);
+			var retval = new StatePatch(flag,
 							 oldState.Timestamp.Event,
 							 newState.Timestamp.Event,
 							 ostream.ToArray());
@@ -214,102 +266,83 @@ namespace Cocktail
 		//    GeneratePatch(ostream, newState, pseudoOld, null);
 		//}
 
-		public static void GeneratePatch(Stream ostream, StateSnapshot newState, StateSnapshot oldState, FieldPatchKind? forceKind)
+		public static void GeneratePatch(Stream ostream, StateSnapshot newState, StateSnapshot oldState, PatchFlag? overridingFlag)
 		{
 			if (oldState.TypeName != newState.TypeName)
 				throw new ApplicationException("Mismatch between the type of new and old States");
 
-			var writer = new BinaryWriter(ostream);
+			var flag = overridingFlag.HasValue ? overridingFlag.Value : newState.FindPatchMethod();
+
+			// Every commutative delta has the potential to create a new object, so we need the type
+			if (0 != (flag & (PatchFlag.CreateBit | PatchFlag.CommutativeBit)))
+			{
+				var header = new StateCreationHeader(Type.GetType(newState.TypeName));
+				header.WriteTo(ostream);
+			}
+
 			var fpairs = from f1 in newState.Fields
 						 join f2 in oldState.Fields on f1.Name equals f2.Name
 						 select new FieldPair() { Name = f1.Name, Type = f1.Type, Attrib = f1.Attrib, newVal = f1.Value, oldVal = f2.Value };
+
+			var writer = new BinaryWriter(ostream);
 			foreach (var fp in fpairs)
 			{
-				writer.Write(fp.Name);
-				var patchKind = forceKind.HasValue ? forceKind.Value : fp.Attrib.PatchKind;
-				writer.Write((ushort)patchKind);
-				SerializeField(writer, fp, forceKind);
+				SerializeField(writer, fp, flag);
 			}
 		}
 
 		public static void PatchState(Stream istream, State state)
 		{
 			var reader = new BinaryReader(istream);
-				while (reader.PeekChar() != -1)
-				{
-					DeserializeField(reader, state);
-				}
-		}
-
-		public static bool TryCreateFromPatch(IHId hostST, TStateId stateId, StatePatchingCtx patchCtx, out State created)
-		{
-			if (patchCtx.Metadata.Flag != StatePatchFlag.Create)
+			while (reader.PeekChar() != -1)
 			{
-				created = null;
-				return false;
+				DeserializeField(reader, state);
 			}
-
-			var header = new StateCreationHeader(patchCtx.DataStream);
-			var type = Type.GetType(header.AssemblyQualifiedClassName);
-			// newly created state must start from "FromRev"
-			created = (State)Activator.CreateInstance(type, stateId, HTSFactory.Make(hostST, patchCtx.Metadata.FromEvent));
-			return true;
 		}
 
-		private static void SerializeField(BinaryWriter writer, FieldPair fpair, FieldPatchKind? forceKind = null)
+		private static void SerializeField(BinaryWriter writer, FieldPair fpair, PatchFlag flag)
 		{
-			switch (forceKind.HasValue ? forceKind.Value : fpair.Attrib.PatchKind)
+			writer.Write(fpair.Name);
+			writer.Write((ushort)(flag & ~(PatchFlag.CreateBit | PatchFlag.DestroyBit)));
+
+			if (0 != (flag & PatchFlag.SwapBit))
 			{
-				case FieldPatchKind.CommutativeDelta:
-				case FieldPatchKind.Delta:
-					{
-						Action<BinaryWriter, object, object> func;
-						if (!m_fieldDiffSerializers.TryGetValue(fpair.Type, out func))
-							throw new ApplicationException(string.Format("Unsupported State Field type: {0}", fpair.Type.FullName));
-						func(writer, fpair.newVal, fpair.oldVal);
-					}
-					break;
-				case FieldPatchKind.CommutativeSwap:
-				case FieldPatchKind.Swap:
-					{
-						Action<BinaryWriter, object> func;
-						if (!m_fieldSerializers.TryGetValue(fpair.Type, out func))
-							throw new ApplicationException(string.Format("Unsupported State Field type: {0}", fpair.Type.FullName));
-						func(writer, fpair.newVal);
-					}
-					break;
+				Action<BinaryWriter, object> func;
+				if (!m_fieldSerializers.TryGetValue(fpair.Type, out func))
+					throw new ApplicationException(string.Format("Unsupported State Field type: {0}", fpair.Type.FullName));
+				func(writer, fpair.newVal);
+			}
+			else
+			{
+				Action<BinaryWriter, object, object> func;
+				if (!m_fieldDiffSerializers.TryGetValue(fpair.Type, out func))
+					throw new ApplicationException(string.Format("Unsupported State Field type: {0}", fpair.Type.FullName));
+				func(writer, fpair.newVal, fpair.oldVal);
 			}
 		}
 
 		private static void DeserializeField(BinaryReader reader, State state)
 		{
 			var fieldName = reader.ReadString();
-			FieldPatchKind patchKind = (FieldPatchKind)reader.ReadInt16();
+			var patchKind = (PatchFlag)reader.ReadInt16();
 
 			var fi = state.GetType().GetField(fieldName);
 			var host = state;
-			switch (patchKind)
-			{
-				case FieldPatchKind.CommutativeDelta:
-				case FieldPatchKind.Delta:
-					{
-						Action<BinaryReader, FieldInfo, object> func;
-						if (!m_fieldDeserializers.TryGetValue(fi.FieldType, out func))
-							throw new ApplicationException(string.Format("Unsupported State Field type: {0}", fi.FieldType.FullName));
-						func(reader, fi, host);
-					}
-					break;
-				case FieldPatchKind.CommutativeSwap:
-				case FieldPatchKind.Swap:
-					{
-						Action<BinaryReader, FieldInfo, object> func;
-						if (!m_fieldDiffDeserializers.TryGetValue(fi.FieldType, out func))
-							throw new ApplicationException(string.Format("Unsupported State Field type: {0}", fi.FieldType.FullName));
-						func(reader, fi, host);
-					}
-					break;
-			}
 
+			if (0 != (patchKind & PatchFlag.SwapBit))
+			{
+				Action<BinaryReader, FieldInfo, object> func;
+				if (!m_fieldDiffDeserializers.TryGetValue(fi.FieldType, out func))
+					throw new ApplicationException(string.Format("Unsupported State Field type: {0}", fi.FieldType.FullName));
+				func(reader, fi, host);
+			}
+			else
+			{
+				Action<BinaryReader, FieldInfo, object> func;
+				if (!m_fieldDeserializers.TryGetValue(fi.FieldType, out func))
+					throw new ApplicationException(string.Format("Unsupported State Field type: {0}", fi.FieldType.FullName));
+				func(reader, fi, host);
+			}
 		}
 
 		private static Dictionary<Type, Action<BinaryWriter, object>> m_fieldSerializers

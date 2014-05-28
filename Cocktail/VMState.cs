@@ -21,7 +21,8 @@ namespace Cocktail
 		}
 
 		private Interpreter m_interpreter;
-		[StateField(PatchKind = FieldPatchKind.CommutativeDelta)]
+
+		[StateField(PatchKind = FieldPatchCompatibility.CommutativeDelta)]
 		private Dictionary<string, FunctionMetadata> m_functionMetadatas = new Dictionary<string, FunctionMetadata>();
 
 		public VMState( IHTimestamp stamp)
@@ -115,31 +116,6 @@ namespace Cocktail
 				var methodInfo = Type.GetType(entry.HostClass).GetMethod(entry.MethodName);
 				m_interpreter.DeclareAndLink(entry.Name, methodInfo);
 			}
-		}
-	}
-
-	public class VMSpacetime : Spacetime
-	{
-		public readonly TStateId VMStateId;
-
-		public VMSpacetime(IHIdFactory idFactory)
-			:base(idFactory.CreateFromRoot(), HTSFactory.CreateZeroEvent(), idFactory)
-		{
-			VMStateId = m_vm.StateId;
-			m_storageComponent.AddNativeState(m_vm);
-			DOA.NamingSvcClient.Instance.RegisterObject(VMStateId.ToString(),m_vm.GetType().FullName, m_vm);
-		}
-
-		public void VMExecute(string funcName, params object[] constArgs)
-		{
-			VMExecuteArgs(funcName, constArgs);
-		}
-
-		public void VMExecuteArgs(string funcName, IEnumerable<object> constArgs)
-		{
-			ExecuteArgs(funcName
-				, InterpUtils.MakeArgList("VM", new LocalStateRef<VMState>(m_vm))
-				, constArgs);
 		}
 	}
 
