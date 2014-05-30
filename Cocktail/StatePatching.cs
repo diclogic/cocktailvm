@@ -122,6 +122,12 @@ namespace Cocktail
 			public StateFieldAttribute Attrib;
 		}
 
+		public class FieldEntryEqualityComparer : IEqualityComparer<FieldEntry>
+		{
+			public bool Equals(FieldEntry x, FieldEntry y) { return x.Name == y.Name; }
+			public int GetHashCode(FieldEntry obj) { return obj.Name.GetHashCode(); }
+		}
+
 		public TStateId ID;
 		public IHTimestamp Timestamp;
 		public long Rev;
@@ -135,7 +141,6 @@ namespace Cocktail
 			Timestamp = timestamp;
 			Rev = rev;
 		}
-
 	}
 
 	public static class StatePatchingExtension

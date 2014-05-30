@@ -166,7 +166,7 @@ namespace Cocktail
 		{
 			if (m_patchMethod == StatePatchMethod.Auto)
 			{
-				StatePatchUtils.GeneratePatch(ostream, this.GetSnapshot(), oldSnapshot, null);
+				StatePatchUtils.GeneratePatch(ostream, this.Snapshot(), oldSnapshot, null);
 			}
 			else
 			{
@@ -175,15 +175,15 @@ namespace Cocktail
 
 		}
 
-		public virtual void DoSerialize(Stream ostream, StateSnapshot oldSnapshot) { throw new NotImplementedException(); }
+		protected virtual void DoSerialize(Stream ostream, StateSnapshot oldSnapshot) { throw new NotImplementedException(); }
 
-		public StateSnapshot GetSnapshot() { return GetSnapshot(LatestUpdate); }
-		public StateSnapshot GetSnapshot( IHEvent overridingEvent)
+		public StateSnapshot Snapshot() { return Snapshot(LatestUpdate); }
+		public StateSnapshot Snapshot( IHEvent overridingEvent)
 		{
-			return GetSnapshot(HTSFactory.Make(SpacetimeID, overridingEvent));
+			return Snapshot(HTSFactory.Make(SpacetimeID, overridingEvent));
 		}
 
-		public StateSnapshot GetSnapshot( IHTimestamp overridingTS)
+		public StateSnapshot Snapshot( IHTimestamp overridingTS)
 		{
 			var retval = new StateSnapshot(StateId, GetType().FullName, overridingTS, Rev);
 
@@ -205,7 +205,7 @@ namespace Cocktail
 			return retval;
 		}
 
-		public virtual StateSnapshot DoSnapshot(StateSnapshot initial) { throw new NotImplementedException(); }
+		protected virtual StateSnapshot DoSnapshot(StateSnapshot initial) { throw new NotImplementedException(); }
 
 		internal void OnCommitting(IHEvent evtFinal)
 		{

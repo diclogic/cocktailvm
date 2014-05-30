@@ -51,7 +51,8 @@ namespace HTS
 
 		public bool HappenedBefore(IHEvent rhs)
 		{
-			throw new NotImplementedException();
+			// x < y  =>  !(y <= x)
+			return !itc.Event.Leq((rhs as ITCEvent).m_impl, m_impl);
 		}
 
 		public IHEvent Advance(IHId id)

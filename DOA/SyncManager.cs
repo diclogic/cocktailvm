@@ -49,6 +49,36 @@ namespace DOA
 			return m_spaceTimes[idPuller].SyncPullRequest(idRequester, foreignExpectedEvent, affectedStates);
 		}
 
+		public StateSnapshot AggregateDistributedDelta(IEnumerable<IHId> STIDs, TStateId state, IHEvent evtUpTo)
+		{
+			return DoAggregateDistributedDelta(m_spaceTimes.Where(kv => STIDs.Contains(kv.Key)).Select(kv => kv.Value), state, evtUpTo);
+		}
+
+		public StateSnapshot AggregateDistributedDelta(TStateId state, IHEvent evtUpTo)
+		{
+			return DoAggregateDistributedDelta(m_spaceTimes.Values, state, evtUpTo);
+		}
+		private StateSnapshot DoAggregateDistributedDelta(IEnumerable<Spacetime> spacetimes, TStateId stateId, IHEvent evtUpTo)
+		{
+			var firstST = spacetimes.First();
+			StateSnapshot seed = firstST.ExportStateSnapshot(stateId);
+
+			// cleanup all non-CommutativeDelta in seed
+			foreach (var f in seed.Fields)
+			{
+				if (0 == (f.Attrib.PatchKind & FieldPatchCompatibility.CommutativeDelta))
+					f.Value = null;
+			}
+
+			foreach (var spacetime in spacetimes.Skip(1))
+			{
+				var state = spacetime.ExportStateSnapshot(stateId);
+				seed.Aggregate(state);
+			}
+
+			return seed;
+		}
+
 		public void Initialize(VMSpacetime vmST)
 		{
 			m_vmST = vmST;

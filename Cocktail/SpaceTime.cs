@@ -197,6 +197,21 @@ namespace Cocktail
 			}
 		}
 
+		/// <summary>
+		/// Designed to be used by foreign spacetime
+		/// </summary>
+		public StateSnapshot ExportStateSnapshot(TStateId stateId, IHEvent evtUpTo)
+		{
+			throw new NotImplementedException();
+		}
+
+		public StateSnapshot ExportStateSnapshot(TStateId stateId)
+		{
+			var state = m_storageComponent.GetState(stateId);
+			var snapshot = state.Snapshot();	
+			return snapshot;
+		}
+
 		///// <summary>
 		///// Create another ST in parallel to this one.
 		///// won't expect to merge it with this ST in the future.
@@ -299,74 +314,24 @@ namespace Cocktail
 			var redo = new RedoEntry();
 
 			IEnumerable<TStateId> nativeIds, foreignIds;
-			SplitStateParams(stateParams.Select((sp) => sp.Value.StateId), out nativeIds, out foreignIds);
+			SplitStateParams(out nativeIds, out foreignIds, stateParams.Select((sp) => sp.Value.StateId));
 
-			var foreignStates = new List<KeyValuePair<IHId,TStateId>>();
 			var foreignSTIds = Enumerable.Empty<IHId>();
-			var pullSTs = Enumerable.Empty<IGrouping<IHId, TStateId>>();
+			var pulledSTs = Enumerable.Empty<IGrouping<IHId, TStateId>>();
 			if (foreignIds.Count() > 0)
 			{
-				// Fetch it from somewhere
-				foreach (var sid in foreignIds)
-				{
-					var hid = NamingSvcClient.Instance.GetObjectSpaceTimeID(sid.ToString());
-					foreignStates.Add(new KeyValuePair<IHId,TStateId>(hid,sid));
-				}
-				foreignSTIds = foreignStates.Select(kv=>kv.Key).Distinct();
+				var foreignStates = FetchForeignStateIdPair(foreignIds);
+				foreignSTIds = foreignStates.Select(kv => kv.Key).Distinct();
+				var foreignSTs = FetchForeignSpacetime(foreignSTIds, evtOriginal);
 
-				var foreignSTs = foreignSTIds.Select(id => PseudoSyncMgr.Instance.GetSpacetime(id, evtOriginal))
-											.Where(val=>val.HasValue)
-											.ToDictionary(val=>val.Value.Timestamp.ID, val=>val.Value);
-
-				pullSTs = foreignStates.Where(sp =>
-					{
-						var state = foreignSTs[sp.Key].States.FirstOrDefault(s => s.StateId.Equals(sp.Value));
-						if (state == null)
-							throw new ApplicationException("No such state in foreign Spacetime and creating state into external ST is not allowed");
-						return (0 == (state.GetPatchFlag() & PatchFlag.CommutativeBit));
-					}).GroupBy(kv => kv.Key, kv => kv.Value);
-
-				// because we know who is involved, we can give headsup to them beforehand
-				foreach (var st in pullSTs)
-					if (PrePullResult.Failed == PseudoSyncMgr.Instance.PrePullRequest(st.Key, this.ID, evtOriginal, st))
-						throw new ApplicationException("Failed to lock foreign ST");
-
-				IHTimestamp failingST = null;
-				foreach (var st in foreignSTs)
-				{
-					if (!DoPullFrom(st.Value.Timestamp, st.Value.Redos, ref evtFinal))
-					{
-						failingST = st.Value.Timestamp;
-						break;
-					}
-				}
-				
-				// failed to merge foreign ST
-				if (failingST != null)
-				{
+				if (!PullForeignSTForExecution(out pulledSTs, foreignIds, foreignSTs, evtOriginal, evtFinal))
 					AbortChronon();
-					return false;
-				}
-
-				var stateStamps = new Dictionary<TStateId, IHEvent>();
-				foreach (var st in foreignSTs)
-				{
-					foreach (var state in st.Value.LatestEvents)
-					{
-						if (stateStamps.ContainsKey(state.Key) && !stateStamps[state.Key].KnownBy(state.Value))
-							continue;
-
-						stateStamps[state.Key] = state.Value;
-					}
-				}
 			}
 
 			//---------- collect old snapshot for redo ----------
 
-			var states = m_storageComponent.GetAllStates( stateParams.Select(sp => sp.Value.StateId));
-			var oldSnapshots = new List<StateSnapshot>();
-			foreach (var ns in states)
-				oldSnapshots.Add(ns.GetSnapshot());
+			var states = m_storageComponent.GetAllStates(stateParams.Select(sp => sp.Value.StateId));
+			var oldSnapshots = states.Select(ns => ns.GetSnapshot()).ToList();
 
 			//-------- execute ---------
 
@@ -380,28 +345,31 @@ namespace Cocktail
 			redo.LocalChanges = new Dictionary<TStateId, StatePatch>();
 
 			foreach (var spair in
-						from s1 in states join s2 in oldSnapshots on s1.StateId equals s2.ID 
-						select new SnapshotPair(s1,s2))
+						from s1 in states
+						join s2 in oldSnapshots on s1.StateId equals s2.ID
+						select new SnapshotPair(s1, s2))
 			{
 				var patch = spair.First.Serialize(spair.Second, evtFinal);
 				redo.LocalChanges.Add(spair.First.StateId, patch);
 			}
 
 			//--------- get approve from foreign STs ---------
-			// Send "pull request" to spacetimes whose non-commutative sates we changed
-			bool bApproved = true;
-			var pulledSTIds = new List<IHId>();
-			foreach (var fst in pullSTs)
+			// Send "pull request" (ask them to pull us) to spacetimes whose non-commutative sates we changed
 			{
-				bApproved &= PseudoSyncMgr.Instance.SyncPullRequest(fst.Key, this.ID, evtFinal, redo.LocalChanges.Where(kv => fst.Contains(kv.Key)).ToLookup(kv => kv.Key, kv => kv.Value));
-				pulledSTIds.Add(fst.Key);
-			}
+				bool bApproved = true;
+				var requestedSTIDs = new List<IHId>();
+				foreach (var fst in pulledSTs)
+				{
+					bApproved &= PseudoSyncMgr.Instance.SyncPullRequest(fst.Key, this.ID, evtFinal, redo.LocalChanges.Where(kv => fst.Contains(kv.Key)).ToLookup(kv => kv.Key, kv => kv.Value));
+					requestedSTIDs.Add(fst.Key);
+				}
 
-			if (!bApproved)
-			{
-				//foreach (var stId in pulledSTIds)
-				//    PseudoSyncMgr.Instance.RollbackPullRequest(stId);
-				return false;
+				if (!bApproved)
+				{
+					//foreach (var stId in pulledSTIds)
+					//    PseudoSyncMgr.Instance.RollbackPullRequest(stId);
+					return false;
+				}
 			}
 
 			// ---------- commit to local ST ------------
@@ -410,6 +378,72 @@ namespace Cocktail
 			// Push native changes to spacetimes that are highly depend on us
 
 			return true;
+		}
+
+		private static IEnumerable<KeyValuePair<IHId, TStateId>> FetchForeignStateIdPair(IEnumerable<TStateId> foreignIds)
+		{
+			foreach (var sid in foreignIds)
+			{
+				var hid = NamingSvcClient.Instance.GetObjectSpaceTimeID(sid.ToString());
+				yield return new KeyValuePair<IHId, TStateId>(hid, sid);
+			}
+		}
+
+		/// <summary>
+		/// Fetch foreign Spacetimes up to a certain event
+		/// </summary>
+		private static IDictionary<IHId, SpacetimeSnapshot> FetchForeignSpacetime(IEnumerable<IHId> foreignSTIDs, IHEvent evtUpto)
+		{
+			return foreignSTIDs.Select(id => PseudoSyncMgr.Instance.GetSpacetime(id, evtUpto))
+										.Where(val => val.HasValue)
+										.ToDictionary(val => val.Value.Timestamp.ID, val => val.Value);
+		}
+
+		private static IDictionary<TStateId, IHEvent> ExtractNewStamps(IDictionary<IHId, SpacetimeSnapshot> spacetimes)
+		{
+			var stateStamps = new Dictionary<TStateId, IHEvent>();
+			foreach (var st in spacetimes)
+			{
+				foreach (var state in st.Value.LatestEvents)
+				{
+					if (stateStamps.ContainsKey(state.Key) && !stateStamps[state.Key].KnownBy(state.Value))
+						continue;
+
+					stateStamps[state.Key] = state.Value;
+				}
+			}
+			return stateStamps;
+		}
+
+		private bool PullForeignSTForExecution(out IEnumerable<IGrouping<IHId, TStateId>> pulledSTs
+												, IEnumerable<TStateId> foreignStateIds
+												, IDictionary<IHId, SpacetimeSnapshot> foreignSTs
+												, IHEvent evtOriginal, IHEvent evtFinal)
+		{
+			pulledSTs = foreignStateIds.Where(sp =>
+				{
+					var state = foreignSTs[sp.Key].States.FirstOrDefault(s => s.StateId.Equals(sp.Value));
+					if (state == null)
+						throw new ApplicationException("No such state in foreign Spacetime and creating state into external ST is not allowed");
+					return (0 == (state.GetPatchFlag() & PatchFlag.CommutativeBit));
+				}).GroupBy(kv => kv.Key, kv => kv.Value);
+
+			// because we know who is involved, we can give headsup to them beforehand
+			foreach (var st in pulledSTs)
+				if (PrePullResult.Failed == PseudoSyncMgr.Instance.PrePullRequest(st.Key, this.ID, evtOriginal, st))
+					throw new ApplicationException("Failed to lock foreign ST");
+
+			IHTimestamp failingST = null;
+			foreach (var st in foreignSTs)
+			{
+				if (!DoPullFrom(st.Value.Timestamp, st.Value.Redos, ref evtFinal))
+				{
+					failingST = st.Value.Timestamp;
+					break;
+				}
+			}
+
+			return (failingST == null);
 		}
 
 		// TODO: the operation should not change spacetime data because it's not committed yet
@@ -457,7 +491,7 @@ namespace Cocktail
 			return true;
 		}
 
-		private void SplitStateParams(IEnumerable<TStateId> stateIds, out IEnumerable<TStateId> natives, out IEnumerable<TStateId> externals)
+		private void SplitStateParams(out IEnumerable<TStateId> natives, out IEnumerable<TStateId> externals, IEnumerable<TStateId> stateIds)
 		{
 			natives = stateIds.Intersect(m_storageComponent.GetNativeStates().Select(s => s.StateId));
 			externals = stateIds.Except(natives);
