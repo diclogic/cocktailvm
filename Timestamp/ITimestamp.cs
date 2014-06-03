@@ -16,7 +16,7 @@ namespace HTS
 
 	public static class HTSFactory
 	{
-		public static IHTimestamp NullValue = new ITCTimestamp(ITCIdentity.Null, ITCEvent.CreateZero());
+		public static readonly IHTimestamp Null = new ITCTimestamp(ITCIdentity.Null, ITCEvent.CreateZero());
 		public static IHTimestamp Make(IHId id, IHEvent event_)
 		{
 			return new ITCTimestamp(id as ITCIdentity, event_ as ITCEvent);

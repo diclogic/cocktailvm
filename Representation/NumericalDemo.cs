@@ -91,8 +91,7 @@ namespace Representation
 			if (m_elapsed > 0.5)
 			{
 				m_accountingInvoker.Transfer(m_initialST, new LocalStateRef<Account>(m_accounts[0]), GenRemoteRef(m_accounts[1])
-									, (float)m_rand.Next(50));
-				SyncSpacetimes();
+									, (float)(m_rand.Next(100)-50));
 			}
 		}
 
@@ -124,25 +123,20 @@ namespace Representation
 			readonly AABB m_worldbox;
 			public Present(List<Account> pts, AABB worldBox)
 			{
-				m_accounts = pts.Select(e => e.GetSnapshot()).ToArray();
+				m_accounts = pts.Select(a => PseudoSyncMgr.Instance.AggregateDistributedDelta(a.StateId)).ToArray();
 				m_worldbox = worldBox;
 			}
+
 			public override void Render()
 			{
 				const float MAX_AMOUNT = 10000;
-				var count = m_accounts.Length;
-				var worldWidth = m_worldbox.Max.X - m_worldbox.Min.X;
-				var worldHeight = m_worldbox.Max.Y - m_worldbox.Min.Y;
-				var stepWidth = worldWidth / count;
-				int index = 0;
 
 				GL.Begin(BeginMode.Triangles);
-				foreach (var p in m_accounts)
+				int index = 0;
+				foreach (var p in m_accounts.Select(acc => (float)acc.Fields.Find(f => f.Name == "Balance").Value))
 				{
 					GL.Color4(Color4.DarkRed);
-					DrawQuadByTriangles(stepWidth * index + m_worldbox.Min.X, m_worldbox.Min.Y
-										, stepWidth * index + (stepWidth / 2.0f)
-										, worldHeight * (float)p.Fields.Find(f=>f.Name == "Balance").Value / MAX_AMOUNT);
+					DrawBar(m_accounts.Length*2, index*2, Math.Min(p, MAX_AMOUNT) / MAX_AMOUNT);
 					++index;
 				}
 				GL.End();
@@ -158,6 +152,18 @@ namespace Representation
 				GL.Vertex2(minX + width, minY);
 				GL.Vertex2(minX + width, minY + height);
 			}
+
+			/// <param name="height">from 0.0 to 1.0</param>
+			private void DrawBar(int total, int index, float height)
+			{
+				var worldWidth = m_worldbox.Max.X - m_worldbox.Min.X;
+				var worldHeight = m_worldbox.Max.Y - m_worldbox.Min.Y;
+				var barWidth = worldWidth / total;
+				DrawQuadByTriangles(barWidth * index + m_worldbox.Min.X, m_worldbox.Min.Y
+										, barWidth
+										, worldHeight * height);
+			}
+
 		}
 		public IPresenter GetPresent()
 		{

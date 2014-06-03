@@ -7,6 +7,7 @@ using HTS;
 using System.Reflection;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
+using System.Globalization;
 
 
 
@@ -19,7 +20,6 @@ namespace Cocktail
 	/// </summary>
 	public static class StateAggregation
 	{
-
 		public static void Aggregate(this StateSnapshot agg, StateSnapshot rhs)
 		{
 			agg.Rev = Math.Max(agg.Rev, rhs.Rev);
@@ -44,9 +44,32 @@ namespace Cocktail
 					throw new PatchException(string.Format("Inconsistant field type found: expecting {0}, got {1}", fpair.First.Type.Name, fpair.Second.Type.Name));
 
 				var type = fpair.First.Type;
-				type.GetMethod();
-				fpair.First.Value = fpair.Second.Value;
+
+				if (type == typeof(int))
+				{
+					Accumulate(ref fpair.First.Value, (int)fpair.Second.Value);
+				}
+				else if (type == typeof(float))
+				{
+					Accumulate(ref fpair.First.Value, (float)fpair.Second.Value);
+				}
+				else if (type == typeof(string))
+				{
+					throw new NotImplementedException();
+				}
+				else
+					throw new PatchException(string.Format("Non-Primitive type found as a field of a state: state {0}, field {1}", agg.TypeName, fpair.First.Name));
 			}
 		}
+
+		private static void Accumulate(ref object acc, int rhs)
+		{
+			acc = (int)acc + rhs;
+		}
+		private static void Accumulate(ref object acc, float rhs)
+		{
+			acc = (float)acc + rhs;
+		}
+
 	}
 }

@@ -96,14 +96,17 @@ namespace Representation
         {
             return new LockGuard(update_lock);
         }
+
         public void Acquire()
         {
             Monitor.Enter(update_lock);
         }
+
         public void Release()
         {
             Monitor.Exit(update_lock);
         }
+
         public void ChangeViewport(int width, int height)
         {
             lock (update_lock)
@@ -113,6 +116,7 @@ namespace Representation
                 viewport_width = width;
             }
         }
+
         void RenderThread()
         {
             m_glCtl.MakeCurrent(); // The context now belongs to this thread. No other thread may use it!
@@ -144,6 +148,7 @@ namespace Representation
 
             m_glCtl.Context.MakeCurrent(null);
         }
+
         /// <summary>
         /// This is our main rendering function, which executes on the rendering thread.
         /// </summary>

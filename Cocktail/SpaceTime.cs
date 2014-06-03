@@ -150,7 +150,7 @@ namespace Cocktail
 			// do create and destroy only for non-commutatives
 			if (0 == (newState.GetPatchFlag() & PatchFlag.CommutativeBit))
 			{
-				var patch = newState.GetSnapshot(evtFinal).GenerateCreatePatch(m_currentTime.Event);
+				var patch = newState.Snapshot(evtFinal).GenerateCreatePatch(m_currentTime.Event);
 				redo.LocalChanges.Add(newState.StateId, patch);
 			}
 
@@ -208,8 +208,10 @@ namespace Cocktail
 		public StateSnapshot ExportStateSnapshot(TStateId stateId)
 		{
 			var state = m_storageComponent.GetState(stateId);
-			var snapshot = state.Snapshot();	
-			return snapshot;
+			if (state == null)
+				return StateSnapshot.CreateNull(stateId);
+
+			return state.Snapshot();	
 		}
 
 		///// <summary>
@@ -320,18 +322,18 @@ namespace Cocktail
 			var pulledSTs = Enumerable.Empty<IGrouping<IHId, TStateId>>();
 			if (foreignIds.Count() > 0)
 			{
-				var foreignStates = FetchForeignStateIdPair(foreignIds);
-				foreignSTIds = foreignStates.Select(kv => kv.Key).Distinct();
+				var foreignStateIdPairs = FetchForeignStateIdPair(foreignIds);
+				foreignSTIds = foreignStateIdPairs.Select(kv => kv.Key).Distinct();
 				var foreignSTs = FetchForeignSpacetime(foreignSTIds, evtOriginal);
 
-				if (!PullForeignSTForExecution(out pulledSTs, foreignIds, foreignSTs, evtOriginal, evtFinal))
+				if (!PullForeignSTForExecution(out pulledSTs, foreignStateIdPairs, foreignSTs, evtOriginal, evtFinal))
 					AbortChronon();
 			}
 
 			//---------- collect old snapshot for redo ----------
 
 			var states = m_storageComponent.GetAllStates(stateParams.Select(sp => sp.Value.StateId));
-			var oldSnapshots = states.Select(ns => ns.GetSnapshot()).ToList();
+			var oldSnapshots = states.Select(ns => ns.Snapshot()).ToList();
 
 			//-------- execute ---------
 
@@ -416,7 +418,7 @@ namespace Cocktail
 		}
 
 		private bool PullForeignSTForExecution(out IEnumerable<IGrouping<IHId, TStateId>> pulledSTs
-												, IEnumerable<TStateId> foreignStateIds
+												, IEnumerable<KeyValuePair<IHId, TStateId>> foreignStateIds
 												, IDictionary<IHId, SpacetimeSnapshot> foreignSTs
 												, IHEvent evtOriginal, IHEvent evtFinal)
 		{

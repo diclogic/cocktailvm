@@ -49,19 +49,28 @@ namespace DOA
 			return m_spaceTimes[idPuller].SyncPullRequest(idRequester, foreignExpectedEvent, affectedStates);
 		}
 
-		public StateSnapshot AggregateDistributedDelta(IEnumerable<IHId> STIDs, TStateId state, IHEvent evtUpTo)
+		public StateSnapshot AggregateDistributedDelta(IEnumerable<IHId> STIDs, TStateId state)
 		{
-			return DoAggregateDistributedDelta(m_spaceTimes.Where(kv => STIDs.Contains(kv.Key)).Select(kv => kv.Value), state, evtUpTo);
+			return DoAggregateDistributedDelta(m_spaceTimes.Where(kv => STIDs.Contains(kv.Key)).Select(kv => kv.Value), state);
 		}
 
-		public StateSnapshot AggregateDistributedDelta(TStateId state, IHEvent evtUpTo)
+		public StateSnapshot AggregateDistributedDelta(TStateId state)
 		{
-			return DoAggregateDistributedDelta(m_spaceTimes.Values, state, evtUpTo);
+			return DoAggregateDistributedDelta(m_spaceTimes.Values, state);
 		}
-		private StateSnapshot DoAggregateDistributedDelta(IEnumerable<Spacetime> spacetimes, TStateId stateId, IHEvent evtUpTo)
+
+		private StateSnapshot DoAggregateDistributedDelta(IEnumerable<Spacetime> spacetimes, TStateId stateId)
 		{
-			var firstST = spacetimes.First();
-			StateSnapshot seed = firstST.ExportStateSnapshot(stateId);
+			// find first ST that contains the state
+			StateSnapshot seed = StateSnapshot.CreateNull(stateId);
+			int skipCount = 0;
+			foreach (var st in spacetimes)
+			{
+				seed = st.ExportStateSnapshot(stateId);
+				++skipCount;
+				if (!string.IsNullOrEmpty(seed.TypeName))
+					break;
+			}
 
 			// cleanup all non-CommutativeDelta in seed
 			foreach (var f in seed.Fields)
@@ -70,6 +79,11 @@ namespace DOA
 					f.Value = null;
 			}
 
+			return DoAggregateDistributedDelta(spacetimes.Skip(skipCount), stateId, seed);
+		}
+
+		private StateSnapshot DoAggregateDistributedDelta(IEnumerable<Spacetime> spacetimes, TStateId stateId, StateSnapshot seed)
+		{
 			foreach (var spacetime in spacetimes.Skip(1))
 			{
 				var state = spacetime.ExportStateSnapshot(stateId);

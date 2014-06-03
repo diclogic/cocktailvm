@@ -141,6 +141,11 @@ namespace Cocktail
 			Timestamp = timestamp;
 			Rev = rev;
 		}
+
+		public static StateSnapshot CreateNull(TStateId id)
+		{
+			return new StateSnapshot(id, string.Empty, HTSFactory.Null, 0);
+		}
 	}
 
 	public static class StatePatchingExtension
@@ -215,12 +220,13 @@ namespace Cocktail
 
 		public static PatchFlag FindPatchMethod(IEnumerable<FieldPatchCompatibility> fieldPatchKinds)
 		{
-			var actionBits = fieldPatchKinds.Aggregate(PatchFlag.None, (accu, elem) =>
+			var iniVal = PatchFlag.None | PatchFlag.CommutativeBit;
+			var actionBits = fieldPatchKinds.Aggregate(iniVal, (accu, elem) =>
 				{
 					// if anything is non-commutative, the state is non-commutative
 					if (0 == (elem & (FieldPatchCompatibility.CommutativeDelta | FieldPatchCompatibility.CommutativeSwap)))
 					{
-						accu |= PatchFlag.CommutativeBit;
+						accu &= ~PatchFlag.CommutativeBit;
 					}
 
 					// if anything is swap, then it's a swap

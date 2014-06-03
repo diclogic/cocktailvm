@@ -43,7 +43,7 @@ namespace Cocktail
 			m_interpreter.Call(eventName, states, constArgs);
 		}
 
-		public override StateSnapshot DoSnapshot(StateSnapshot initial)
+		protected override StateSnapshot DoSnapshot(StateSnapshot initial)
 		{
 			var retval = initial;
 			var entry = new StateSnapshot.FieldEntry();
@@ -55,7 +55,7 @@ namespace Cocktail
 			return retval;
 		}
 
-		public override void DoSerialize(Stream ostream, StateSnapshot oldSnapshot)
+		protected override void DoSerialize(Stream ostream, StateSnapshot oldSnapshot)
 		{
 			var oldDict = (Dictionary<string,FunctionMetadata>)oldSnapshot.Fields.First(field => field.Name == "m_functionMetadatas").Value;
 			foreach (var k in m_functionMetadatas.Keys.Except(oldDict.Keys))
