@@ -49,12 +49,6 @@
     <Compile Include="CocktailTest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\Actions\Demos.csproj">
-      <Project>{C318BDB0-D222-47E4-8839-017459FE48F2}</Project>
-      <Name>Demos</Name>
-    </ProjectReference>
-  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

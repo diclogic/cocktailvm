@@ -6,7 +6,7 @@ using OpenTK;
 using OpenTK.Graphics.OpenGL;
 using MathLib;
 
-namespace Representation
+namespace Skeleton
 {
 
     //////////////////////////////////////////////////////////////////////////

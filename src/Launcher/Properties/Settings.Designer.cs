@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace Representation.Properties
+namespace Launcher.Properties
 {
 
 

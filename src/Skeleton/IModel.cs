@@ -6,7 +6,7 @@ using System.Threading;
 using OpenTK;
 using MathLib;
 
-namespace Representation
+namespace Skeleton
 {
     public interface IPresenter
     {

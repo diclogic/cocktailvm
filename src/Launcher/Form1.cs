@@ -7,9 +7,10 @@ using System.Windows.Forms;
 using OpenTK;
 using OpenTK.Graphics.OpenGL;
 using OpenTK.Graphics;
-using CollisionTest;
+using Skeleton;
+using Demos;
 
-namespace Representation
+namespace Launcher
 {
 
 
@@ -35,18 +36,18 @@ namespace Representation
             };
 
             //HACK: window movement as input for BOUNCE
-            if (m_model.GetType() == typeof(BounceModel))
-            {
-                this.Move += (_, __) =>
-                {
-                    using (var gd = m_renderer.AcquireAuto())
-                    {
-                        (m_model as BounceModel).TriggerMovement(this.Left, this.Top, this.glControl1.Width, this.glControl1.Height);
-                    }
-                };
+			if (m_model.GetType() == typeof(BounceModel))
+			{
+				this.Move += (_, __) =>
+				{
+					using (var gd = m_renderer.AcquireAuto())
+					{
+						(m_model as BounceModel).TriggerMovement(this.Left, this.Top, this.glControl1.Width, this.glControl1.Height);
+					}
+				};
 
-                (m_model as BounceModel).InitMovement(this.Left, this.Top);
-            }
+				(m_model as BounceModel).InitMovement(this.Left, this.Top);
+			}
 
             m_renderer.ChangeViewport(this.glControl1.Width, this.glControl1.Height);
         }

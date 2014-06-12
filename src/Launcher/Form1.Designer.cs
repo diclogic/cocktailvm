@@ -1,4 +1,4 @@
-﻿namespace Representation
+﻿namespace Launcher
 {
     partial class Form1
     {

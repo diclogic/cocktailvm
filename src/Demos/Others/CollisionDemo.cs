@@ -10,8 +10,9 @@ using MathLib;
 using System.Reflection;
 using Cocktail;
 using CollisionTest.States;
+using Skeleton;
 
-namespace Representation
+namespace Demos
 {
     class CollisionDemo : IModel
     {

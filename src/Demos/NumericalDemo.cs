@@ -11,8 +11,9 @@ using MathLib;
 using Cocktail;
 using Cocktail.HTS;
 using DOA;
+using Skeleton;
 
-namespace Representation
+namespace Demos
 {
 	public class NumericalDemo : IModel
 	{

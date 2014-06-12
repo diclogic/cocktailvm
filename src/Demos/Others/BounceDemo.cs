@@ -7,8 +7,9 @@ using OpenTK.Graphics;
 using OpenTK.Graphics.OpenGL;
 using CollisionTest;
 using MathLib;
+using Skeleton;
 
-namespace Representation
+namespace Demos
 {
     public class BounceModel : IModel
     {
