@@ -2,10 +2,10 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using CollisionTest.States;
+using Demos.States;
 using Cocktail;
 
-namespace CollisionTest
+namespace Demos
 {
 	public interface IAccounting
 	{

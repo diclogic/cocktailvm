@@ -5,7 +5,7 @@ using Common;
 using Cocktail.HTS;
 using OpenTK;
 
-namespace CollisionTest.States
+namespace Demos.States
 {
 	[State]
 	public class Particle : State

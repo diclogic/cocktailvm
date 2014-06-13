@@ -4,7 +4,7 @@ using OpenTK;
 using System.Linq;
 
 
-namespace CollisionTest
+namespace Demos
 {
     static class UseCases
     {

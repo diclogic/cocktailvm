@@ -5,13 +5,13 @@ using System.Text;
 using OpenTK;
 using OpenTK.Graphics;
 using OpenTK.Graphics.OpenGL;
-using CollisionTest;
+using Demos;
 using MathLib;
 using Skeleton;
 
 namespace Demos
 {
-    public class BounceModel : IModel
+    public class BounceModel : BaseModel
     {
         internal struct Particle
         {
@@ -131,7 +131,7 @@ namespace Demos
         }
 
 
-        public IPresenter GetPresent()
+        public override IPresenter GetPresent()
         {
             return new PresentMetadata(Particles);
         }

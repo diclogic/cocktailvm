@@ -6,7 +6,7 @@ using Cocktail;
 using Cocktail.HTS;
 using System.IO;
 
-namespace CollisionTest.States
+namespace Demos.States
 {
     [State]
     public class Account : State

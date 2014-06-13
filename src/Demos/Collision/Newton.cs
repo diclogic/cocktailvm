@@ -4,10 +4,10 @@ using System.Linq;
 using OpenTK;
 using MathLib;
 using Cocktail;
-using CollisionTest.States;
+using Demos.States;
 
 
-namespace CollisionTest
+namespace Demos
 {
 
 

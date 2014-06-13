@@ -2,19 +2,19 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using CollisionTest;
+using Demos;
 using OpenTK;
 using OpenTK.Graphics;
 using OpenTK.Graphics.OpenGL;
 using MathLib;
 using System.Reflection;
 using Cocktail;
-using CollisionTest.States;
+using Demos.States;
 using Skeleton;
 
 namespace Demos
 {
-    class CollisionDemo : IModel
+    class CollisionDemo : BaseModel
     {
         delegate void GodPushDeleg(Particle p,Vector3 v);
         List<Particle> m_particles = new List<Particle>();
@@ -96,7 +96,7 @@ namespace Demos
                 GL.End();
             }
         }
-        public IPresenter GetPresent()
+        public override IPresenter GetPresent()
         {
             return new Present(m_particles);
         }

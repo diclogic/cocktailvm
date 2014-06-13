@@ -2,8 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using CollisionTest.States;
-using CollisionTest;
+using Demos.States;
+using Demos;
 using OpenTK;
 using OpenTK.Graphics;
 using OpenTK.Graphics.OpenGL;
@@ -15,7 +15,7 @@ using Skeleton;
 
 namespace Demos
 {
-	public class NumericalDemo : IModel
+	public class NumericalDemo : BaseModel
 	{
 		delegate void TransferDeleg(Account fromAcc, Account toAcc);
 		List<Account> m_accounts = new List<Account>();
@@ -122,9 +122,14 @@ namespace Demos
 		{
 			StateSnapshot[] m_accounts;
 			readonly AABB m_worldbox;
-			public Present(List<Account> pts, AABB worldBox)
+			public Present(List<Account> accounts, AABB worldBox)
+				:this(accounts.Select(a => PseudoSyncMgr.Instance.AggregateDistributedDelta(a.StateId)).ToArray(), worldBox)
 			{
-				m_accounts = pts.Select(a => PseudoSyncMgr.Instance.AggregateDistributedDelta(a.StateId)).ToArray();
+			}
+
+			protected Present(StateSnapshot[] accounts, AABB worldBox)
+			{
+				m_accounts = accounts;
 				m_worldbox = worldBox;
 			}
 
@@ -143,7 +148,7 @@ namespace Demos
 				GL.End();
 			}
 
-			private void DrawQuadByTriangles(float minX, float minY, float width, float height)
+			protected void DrawQuadByTriangles(float minX, float minY, float width, float height)
 			{
 				GL.Vertex2(minX, minY);
 				GL.Vertex2(minX + width, minY);
@@ -155,7 +160,7 @@ namespace Demos
 			}
 
 			/// <param name="height">from 0.0 to 1.0</param>
-			private void DrawBar(int total, int index, float height)
+			protected void DrawBar(int total, int index, float height)
 			{
 				var worldWidth = m_worldbox.Max.X - m_worldbox.Min.X;
 				var worldHeight = m_worldbox.Max.Y - m_worldbox.Min.Y;
@@ -166,7 +171,17 @@ namespace Demos
 			}
 
 		}
-		public IPresenter GetPresent()
+
+		// this works only because the two states has the key field with same name (Balance)
+		public class Present2 : Present
+		{
+			public Present2(List<MonitoredAccount> accounts, AABB worldBox)
+				:base(accounts.Select(a => a.Snapshot()).ToArray(), worldBox)
+			{
+			}
+		}
+
+		public override IPresenter GetPresent()
 		{
 			return new Present(m_accounts, m_worldBox);
 		}
