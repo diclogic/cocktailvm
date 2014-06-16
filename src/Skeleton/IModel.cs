@@ -22,19 +22,56 @@ namespace Skeleton
         public virtual void PostRender() { }
     }
 
+	public delegate void ActionAssignmentChangedDleg(int actionNum, string command);
+
     public interface IModel
     {
         void Init(AABB worldBox);
 		void Update(IRenderer renderer, double time);
-		void Update(IRenderer renderer, double time, IEnumerable<string> controlCmds);
+		void Input(string controlCmd);
         IPresenter GetPresent();
+
+		event ActionAssignmentChangedDleg ActionAssignmentChanged;
     }
 
 	public abstract class BaseModel : IModel
 	{
+		protected List<string> m_controlCmdQueue = new List<string>();
+
+		public event ActionAssignmentChangedDleg ActionAssignmentChanged;
+
+
 		public virtual void Init(AABB worldBox) { }
-		public virtual void Update(IRenderer renderer, double time) { Update(renderer, time, Enumerable.Empty<string>()); }
-		public virtual void Update(IRenderer renderer, double time, IEnumerable<string> controlCmds) { }
 		public abstract IPresenter GetPresent();
+
+		public void Update(IRenderer renderer, double time)
+		{
+			List<string> controlCmds;
+			lock (m_controlCmdQueue)
+			{
+				controlCmds = m_controlCmdQueue;
+				m_controlCmdQueue = new List<string>();
+			}
+
+			Update(renderer, time, controlCmds);
+		}
+
+		public virtual void Update(IRenderer renderer, double time, IEnumerable<string> controlCmds)
+		{
+		}
+
+		public void Input(string controlCmd)
+		{
+			lock (m_controlCmdQueue)
+				m_controlCmdQueue.Add(controlCmd);
+		}
+
+		protected void FireActionAssignmentChanged(int actionNum, string command)
+		{
+			if (ActionAssignmentChanged != null)
+			{
+				ActionAssignmentChanged(actionNum, command);
+			}
+		}
 	}
 }

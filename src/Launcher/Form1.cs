@@ -9,6 +9,9 @@ using OpenTK.Graphics.OpenGL;
 using OpenTK.Graphics;
 using Skeleton;
 using Demos;
+using System.Linq;
+using System.Text.RegularExpressions;
+using System.Reflection;
 
 namespace Launcher
 {
@@ -18,6 +21,7 @@ namespace Launcher
     {
         IModel m_model;
         Renderer m_renderer;
+		Dictionary<int, string> m_actions = new Dictionary<int,string>();
 
         public Form1()
         {
@@ -25,40 +29,32 @@ namespace Launcher
 
             this.glControl1.Paint += new System.Windows.Forms.PaintEventHandler(this.glControl1_Paint);
             this.glControl1.Load += new System.EventHandler(this.glControl1_Load);
+			this.button1.Click += new EventHandler(OnButtonClick);
+			this.button2.Click += new EventHandler(OnButtonClick);
 
             m_renderer = new Renderer(this.glControl1);
 			m_model = LoadModel("");
+			m_model.ActionAssignmentChanged += OnActionAssignmentChanged;
+
             m_renderer.Model = m_model;
 
+			this.Move += new EventHandler(Form1_Move);
             this.Resize += (_,__) => 
-            {
                 m_renderer.ChangeViewport(this.glControl1.Width, this.glControl1.Height);
-            };
 
             //HACK: window movement as input for BOUNCE
-			if (m_model.GetType() == typeof(BounceModel))
-			{
-				this.Move += (_, __) =>
-				{
-					using (var gd = m_renderer.AcquireAuto())
-					{
-						(m_model as BounceModel).TriggerMovement(this.Left, this.Top, this.glControl1.Width, this.glControl1.Height);
-					}
-				};
-
-				(m_model as BounceModel).InitMovement(this.Left, this.Top);
-			}
+			m_model.Input(string.Format("move init {0} {1}", this.Left, this.Top));
 
             m_renderer.ChangeViewport(this.glControl1.Width, this.glControl1.Height);
         }
 
 		private IModel LoadModel(string hint)
 		{
-			string fullname = null;
+			string fullname = hint;
 			if (string.IsNullOrEmpty(hint))
 			{
-				hint = "Representation.NumericalDemo";
-				fullname = typeof(NumericalDemo).AssemblyQualifiedName;
+				fullname = typeof(MultiModel).AssemblyQualifiedName;
+				Assembly.Load(AssemblyName.GetAssemblyName("Demos.dll"));
 			}
 
             //m_model = new BounceModel();
@@ -71,16 +67,40 @@ namespace Launcher
             base.OnLoad(e);
         }
 
-        private void glControl1_Load(object sender, EventArgs e)
-        {
-            glControl1.Context.MakeCurrent(null); // Release the OpenGL context so it can be used on the new thread.
-            m_renderer.Start();
-        }
-
         protected override void  OnClosing(System.ComponentModel.CancelEventArgs e)
         {
             m_renderer.Stop();
             base.OnClosing(e);
+        }
+
+		protected void OnActionAssignmentChanged(int actionNum, string command)
+		{
+			m_actions[actionNum] = command;
+		}
+
+		void OnButtonClick(object sender, EventArgs e)
+		{
+			var match = Regex.Match(((Button)sender).Name, "button([0-9])");
+			if (match.Groups.Count != 2)
+				return;
+
+			var buttonNumber = int.Parse(match.Groups[1].Captures[0].Value);
+
+			string cmd;
+			if (m_actions.TryGetValue(buttonNumber, out cmd))
+				m_model.Input(cmd);
+		}
+
+		void Form1_Move(object sender, EventArgs e)
+		{
+			//(m_model as BounceModel).TriggerMovement(this.Left, this.Top, this.glControl1.Width, this.glControl1.Height);
+			m_model.Input(string.Format("move {0} {1} {2} {3}", Left, Top, glControl1.Width, glControl1.Height));
+		}
+
+        private void glControl1_Load(object sender, EventArgs e)
+        {
+            glControl1.Context.MakeCurrent(null); // Release the OpenGL context so it can be used on the new thread.
+            m_renderer.Start();
         }
 
         private void glControl1_Paint(object sender, PaintEventArgs e)

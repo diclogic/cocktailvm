@@ -38,7 +38,7 @@ namespace Demos
 			m_accountingInvoker = InvocationBuilder.Build<IAccounting>();
 		}
 
-		public void Init(AABB worldBox)
+		public override void Init(AABB worldBox)
 		{
 			m_worldBox = worldBox;
 
@@ -104,12 +104,26 @@ namespace Demos
 			SyncSpacetimes();
 		}
 
-		public void Update(IRenderer renderer, double dt)
+		private void SwitchDemo()
+		{
+			
+		}
+
+		public override void Update(IRenderer renderer, double dt, IEnumerable<string> controlCmds)
 		{
 			const double UpdateInterval = 1.0 / 60.0;
 
 			m_elapsed += dt;
 			m_accumulate += dt;
+
+			foreach (var cmd in controlCmds)
+			{
+				var args = cmd.Split(' ');
+				if (args.Length > 0 && args[0] == "action")
+				{
+					SwitchDemo();
+				}
+			}
 
 			while (m_accumulate > UpdateInterval)
 			{
