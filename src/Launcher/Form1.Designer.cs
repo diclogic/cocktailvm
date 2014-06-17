@@ -47,7 +47,11 @@
 			this.glControl1.BackColor = System.Drawing.Color.Black;
 			this.glControl1.Location = new System.Drawing.Point(12, 12);
 			this.glControl1.Name = "glControl1";
-			this.glControl1.Size = new System.Drawing.Size(494, 371);
+			if (Type.GetType("Mono.Runtime")!= null)
+				this.glControl1.Size = new System.Drawing.Size(494, 341);
+			else
+				this.glControl1.Size = new System.Drawing.Size(494, 371);
+
 			this.glControl1.TabIndex = 1;
 			this.glControl1.VSync = false;
 			// 

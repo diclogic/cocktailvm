@@ -41,9 +41,6 @@
     <GenerateManifests>true</GenerateManifests>
   </PropertyGroup>
   <PropertyGroup />
-  <PropertyGroup>
-    <StartupObject />
-  </PropertyGroup>
   <ItemGroup>
     <Reference Include="OpenTK">
       <HintPath>..\SDKs\opentk\Binaries\OpenTK\Release\OpenTK.dll</HintPath>

@@ -1,17 +1,15 @@
-﻿
-
+﻿using System;
 using System.Collections.Generic;
-using MathLib;
-using System;
 using System.Linq;
 using System.Reflection;
+using MathLib;
 
 namespace Skeleton
 {
 	public class MultiModel : BaseModel
 	{
-		private List<IModel> m_modelCache = new List<IModel>();
-		private IModel m_currentModel = null;
+		private List<BaseModel> m_modelCache = new List<BaseModel>();
+		private BaseModel m_currentModel = null;
 		private AABB m_worldBox = new AABB();
 		private readonly IPresenter m_nullPresenter = new NullPresenter();
 
@@ -32,12 +30,14 @@ namespace Skeleton
 				else if (args[0] == "unload")
 					Unload(args[1]);
 			}
+
+			if (m_currentModel != null)
+				m_currentModel.Update(renderer, time, controlCmds);
 		}
 
 		public void Load(string hint)
 		{
 			Type type = null;
-			var launcher = Assembly.GetEntryAssembly();
 			foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
 			{
 				var tt = asm.GetTypes().FirstOrDefault(t => t.Name == hint || t.FullName == hint);
@@ -59,7 +59,7 @@ namespace Skeleton
 				return;
 			}
 
-			IModel newModel = Activator.CreateInstance(type) as IModel;
+			var newModel = Activator.CreateInstance(type) as BaseModel;
 			if (newModel == null)
 				throw new ApplicationException(string.Format("The given class is not inherited from IModel: {0}", type.FullName));
 

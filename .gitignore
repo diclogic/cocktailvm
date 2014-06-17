@@ -4,3 +4,4 @@ obj/
 bin/
 *.user
 Properties/app.manifest
+*.userprefs
