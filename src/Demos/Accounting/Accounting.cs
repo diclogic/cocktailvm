@@ -7,12 +7,13 @@ using Cocktail;
 
 namespace Demos
 {
+	[Invoker]
 	public interface IAccounting
 	{
-		//void Test(Spacetime ST, StateRef account);
-		void Deposit(Spacetime ST, StateRef account, float amount);
-		void Transfer(Spacetime ST, StateRef fromAcc, StateRef toAcc, float amount);
-		void Withdraw(Spacetime ST, StateRef account, float amount);
+		//void Test(StateRef account);
+		void Deposit(StateRef account, float amount);
+		void Transfer(StateRef fromAcc, StateRef toAcc, float amount);
+		void Withdraw(StateRef account, float amount);
 	}
 
     public static class Accounting
@@ -29,6 +30,25 @@ namespace Demos
         }
 
 		public static void Withdraw([State] Account account, float amount)
+		{
+			account.Balance -= amount;
+		}
+    }
+
+    public static class ConstrainedAccounting
+    {
+		public static void Deposit([State] MonitoredAccount account, float amount)
+		{
+			account.Balance += amount;
+		}
+
+        public static void Transfer([State] MonitoredAccount fromAcc, [State] MonitoredAccount toAcc, float amount)
+        {
+            fromAcc.Balance -= amount;
+            toAcc.Balance += amount;
+        }
+
+		public static void Withdraw([State] MonitoredAccount account, float amount)
 		{
 			account.Balance -= amount;
 		}

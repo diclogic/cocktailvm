@@ -58,6 +58,7 @@
     <Compile Include="HTS\ITimestamp.cs" />
     <Compile Include="VMSpacetime.cs" />
     <Compile Include="VMState.cs" />
+    <Compile Include="WithIn.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ITCSharp\ITCSharp.csproj">

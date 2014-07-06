@@ -21,7 +21,7 @@ namespace Skeleton
         public virtual void PostRender() { }
     }
 
-	public delegate void ActionAssignmentChangedDleg(int actionNum, string command);
+	public delegate void ActionAssignmentChangedDleg(IEnumerable<KeyValuePair<int,string>> mapping);
 
     public interface IModel
     {
@@ -30,14 +30,15 @@ namespace Skeleton
 		void Input(string controlCmd);
         IPresenter GetPresent();
 
-		event ActionAssignmentChangedDleg ActionAssignmentChanged;
+		event ActionAssignmentChangedDleg ActionMapAssigned;
     }
 
 	public abstract class BaseModel : IModel
 	{
 		protected List<string> m_controlCmdQueue = new List<string>();
+		protected Dictionary<int, string> m_actionMap = new Dictionary<int, string>();
 
-		public event ActionAssignmentChangedDleg ActionAssignmentChanged;
+		public event ActionAssignmentChangedDleg ActionMapAssigned;
 
 
 		public virtual void Init(AABB worldBox) { }
@@ -65,11 +66,21 @@ namespace Skeleton
 				m_controlCmdQueue.Add(controlCmd);
 		}
 
-		protected void FireActionAssignmentChanged(int actionNum, string command)
+		public void RegisterAction(int actionReg, string command)
 		{
-			if (ActionAssignmentChanged != null)
+			m_actionMap[actionReg] = command;
+			FireActionMapAssigned(m_actionMap);
+		}
+		public Dictionary<int, string> GetActionMap()
+		{
+			return m_actionMap;
+		}
+
+		protected void FireActionMapAssigned(IEnumerable<KeyValuePair<int,string>> mapping)
+		{
+			if (ActionMapAssigned != null)
 			{
-				ActionAssignmentChanged(actionNum, command);
+				ActionMapAssigned(mapping);
 			}
 		}
 	}

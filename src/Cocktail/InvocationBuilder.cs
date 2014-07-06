@@ -7,6 +7,9 @@ using System.Text;
 
 namespace Cocktail
 {
+	public class InvokerAttribute : Attribute { }
+
+	
 	public static class InvocationBuilder
 	{
 		public static T Build<T>()
@@ -21,6 +24,10 @@ namespace Cocktail
 			// must be interface
 			if (!interf.IsInterface)
 				throw new JITCompileException(String.Format("Can't create invocation, the type must be an interface: {0}", interf.FullName));
+
+			if (!interf.GetCustomAttributes(typeof(InvokerAttribute), false).Any())
+				throw new JITCompileException(string.Format("Can't create invocation, the type must have [Invoker] attribute: {0}", interf.FullName));
+
 
 			// module creation
 			var module = CreateModule("CocktailInvoker_"+interf.Name);
@@ -48,8 +55,9 @@ namespace Cocktail
 				var ifMethodParams = ifMethod.GetParameters();
 				var loadArgSpacetime = OpCodes.Ldarg_1;
 
-				if (!typeof(Spacetime).IsAssignableFrom(ifMethodParams.FirstOrDefault().ParameterType))
-					throw new JITCompileException("First param must be `Spacetime' or it's subclasses");
+				// Spacetime parameter is no longer needed
+				//if (!typeof(Spacetime).IsAssignableFrom(ifMethodParams.FirstOrDefault().ParameterType))
+				//    throw new JITCompileException("First param must be `Spacetime' or it's subclasses");
 
 				var methodBuilder = typeBuilder.DefineMethod(
 															ifMethod.Name,
@@ -92,7 +100,10 @@ namespace Cocktail
 				// ST.Execute(Spacetime, "Deposit", ...
 				// ST.Execute(..., params object[] args)
 				{
-					il.Emit(loadArgSpacetime);
+					//il.Emit(loadArgSpacetime);
+					var methodGetWthin = typeof(WithIn).GetMethod("GetWithin", new Type[] {} );
+					il.EmitCall(OpCodes.Call, methodGetWthin, null);
+
 					il.Emit(OpCodes.Ldstr, ifMethod.Name);
 					il.Emit(OpCodes.Ldloc, localStateArgs);
 

@@ -1,21 +1,18 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using Demos.States;
-using Demos;
-using OpenTK;
-using OpenTK.Graphics;
-using OpenTK.Graphics.OpenGL;
-using MathLib;
 using Cocktail;
 using Cocktail.HTS;
+using Demos.States;
 using DOA;
+using MathLib;
+using OpenTK.Graphics;
+using OpenTK.Graphics.OpenGL;
 using Skeleton;
 
 namespace Demos
 {
-	public class NumericalDemo : BaseModel
+	public class ConstrainedAccountingDemo : BaseModel
 	{
 		delegate void TransferDeleg(Account fromAcc, Account toAcc);
 		List<Account> m_accounts = new List<Account>();
@@ -23,8 +20,6 @@ namespace Demos
 		double m_accumulate = 0;
 		Random m_rand = new Random();
 		VMSpacetime m_vmST;
-		Spacetime m_initialST;
-		Spacetime m_secondST;
 		List<Spacetime> m_spacetimes = new List<Spacetime>();
 		IHIdFactory m_idFactory = HIdService.GetFactory();
 		NamingSvcClient m_namingSvc = NamingSvcClient.Instance;
@@ -33,7 +28,7 @@ namespace Demos
 		// trivial
 		double m_elapsed;
 
-		public NumericalDemo()
+		public ConstrainedAccountingDemo()
 		{
 			m_accountingInvoker = InvocationBuilder.Build<IAccounting>();
 		}
@@ -43,43 +38,44 @@ namespace Demos
 			m_worldBox = worldBox;
 
 			m_vmST = new VMSpacetime(m_idFactory);
-			// declare a function form for an event, which also means binding an event to one or a few state types
-			m_vmST.VMBind(typeof(IAccounting), typeof(Accounting));
 
-			//kernel.Declare("CreateAccount", FunctionForm.From(typeof(Accounting).GetMethod("CreateAccount")));
-			PseudoSyncMgr.Instance.Initialize(m_vmST);
+			// bind an invocation interface to an implementation
+			m_vmST.VMBind(typeof(IAccounting), typeof(ConstrainedAccounting));
 
 
-			m_initialST = new Spacetime(m_idFactory.CreateFromRoot(), ITCEvent.CreateZero(), m_idFactory);
-			m_secondST = new Spacetime(m_idFactory.CreateFromRoot(), ITCEvent.CreateZero(), m_idFactory);
-			m_spacetimes.Add(m_initialST);
-			m_spacetimes.Add(m_secondST);
-			PseudoSyncMgr.Instance.RegisterSpaceTime(m_initialST);
-			PseudoSyncMgr.Instance.RegisterSpaceTime(m_secondST);
-			PseudoSyncMgr.Instance.PullFromVmSt(m_initialST.ID);
-			PseudoSyncMgr.Instance.PullFromVmSt(m_secondST.ID);
-
-
-			var newAccount = m_initialST.CreateState((st, stamp) => new Account(TStateId.DebugCreate(111), stamp));
-			m_namingSvc.RegisterObject(newAccount.StateId.ToString(), newAccount.GetType().ToString(), newAccount);
-			m_accounts.Add(newAccount as Account);
-
-			newAccount = m_secondST.CreateState((st, stamp) => new Account(TStateId.DebugCreate(222), stamp));
-			m_namingSvc.RegisterObject(newAccount.StateId.ToString(), newAccount.GetType().ToString(), newAccount);
-			m_accounts.Add(newAccount as Account);
-
-
-			foreach (var acc in m_accounts)
 			{
-				m_accountingInvoker.Deposit(m_initialST, GenRemoteRef(acc), 900.0f);
+				var initialST = new Spacetime(m_idFactory.CreateFromRoot(), ITCEvent.CreateZero(), m_idFactory);
+				var secondST = new Spacetime(m_idFactory.CreateFromRoot(), ITCEvent.CreateZero(), m_idFactory);
+				m_spacetimes.AddRange(new [] { initialST, secondST });
 			}
 
-			SyncSpacetimes();
+			// fake the globally existing SyncManager
+			PseudoSyncMgr.Instance.Initialize(m_vmST);
+			foreach(var ST in m_spacetimes)
+					PseudoSyncMgr.Instance.RegisterSpaceTime(ST);
 
-			//MakeCollision();
+			// must pull new VM to use IAccounting
+			foreach (var ST in m_spacetimes)
+				PseudoSyncMgr.Instance.PullFromVmSt(ST.ID);
+
+
+			// create 2 accounts
+			using (new WithIn(m_spacetimes[0]))
+			{
+				for (int ii = 0; ii < 2; ++ii)
+				{
+					var newAccount = m_spacetimes[ii].CreateState((st, stamp) => new Account(TStateId.DebugCreate(111ul * (ulong)ii), stamp));
+					m_namingSvc.RegisterObject(newAccount.StateId.ToString(), newAccount.GetType().ToString(), newAccount);
+					m_accounts.Add(newAccount as Account);
+					m_accountingInvoker.Deposit(GenRemoteRef(newAccount), 900.0f);
+				}
+			}
+
+			// initial chronon
+			SyncSpacetimes();
 		}
 
-		RemoteStateRef GenRemoteRef(State state) { return new RemoteStateRef(state.StateId, state.GetType().ToString()); }
+		static RemoteStateRef GenRemoteRef(State state) { return new RemoteStateRef(state.StateId, state.GetType().ToString()); }
 
 		void SyncSpacetimes()
 		{
@@ -87,26 +83,24 @@ namespace Demos
 			m_spacetimes[0].PullAllFrom(m_spacetimes[1].Snapshot(m_spacetimes[0].LatestEvent));
 		}
 
-		void UpdateWorld(float interval)
-		{
-			if (m_elapsed > 0.5)
-			{
-				m_accountingInvoker.Transfer(m_initialST, new LocalStateRef<Account>(m_accounts[0]), GenRemoteRef(m_accounts[1])
-									, (float)(m_rand.Next(100)-50));
-			}
-		}
-
 		private void MakeCollision()
 		{
-			m_accountingInvoker.Withdraw(m_initialST, new LocalStateRef<Account>(m_accounts[0]), 5.0f);
-			m_accountingInvoker.Transfer(m_secondST, GenRemoteRef(m_accounts[0]), GenRemoteRef(m_accounts[1]), 7.0f);
+			using (new WithIn(m_spacetimes[0]))
+				m_accountingInvoker.Withdraw(new LocalStateRef<Account>(m_accounts[0]), 5.0f);
+			using (new WithIn(m_spacetimes[1]))
+				m_accountingInvoker.Transfer(GenRemoteRef(m_accounts[0]), GenRemoteRef(m_accounts[1]), 7.0f);
 
 			SyncSpacetimes();
 		}
 
-		private void SwitchDemo()
+		void UpdateWorld(float interval)
 		{
-			
+			if (m_elapsed > 0.5)
+			{
+				using(new WithIn(m_spacetimes[0]))
+					m_accountingInvoker.Transfer(new LocalStateRef<Account>(m_accounts[0]), GenRemoteRef(m_accounts[1])
+											, (float)(m_rand.Next(100) - 50));
+			}
 		}
 
 		public override void Update(IRenderer renderer, double dt, IEnumerable<string> controlCmds)
@@ -121,7 +115,6 @@ namespace Demos
 				var args = cmd.Split(' ');
 				if (args.Length > 0 && args[0] == "action")
 				{
-					SwitchDemo();
 				}
 			}
 
