@@ -34,7 +34,7 @@ namespace Launcher
 
             m_renderer = new Renderer(this.glControl1);
 			m_model = LoadModel("");
-			m_model.ActionMapAssigned += OnModelActionMapAssigned;
+			m_model.ActionsAssigned += OnActionsAssigned;
 
             m_renderer.Model = m_model;
 
@@ -73,9 +73,11 @@ namespace Launcher
             base.OnClosing(e);
         }
 
-		protected void OnModelActionMapAssigned(IEnumerable<KeyValuePair<int,string>> mapping)
+		protected void OnActionsAssigned(IEnumerable<KeyValuePair<int,string>> mapping)
 		{
-			m_actions = mapping.ToDictionary(kv => kv.Key, kv => kv.Value);
+			m_actions = new Dictionary<int, string>();
+			foreach (var kv in mapping)
+				m_actions[kv.Key] = kv.Value;
 		}
 
 		void OnButtonClick(object sender, EventArgs e)

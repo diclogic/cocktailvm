@@ -1,7 +1,5 @@
 ﻿using System;
 
-
-
 namespace Launcher
 {
     partial class Form1

@@ -21,7 +21,7 @@ namespace Skeleton
         public virtual void PostRender() { }
     }
 
-	public delegate void ActionAssignmentChangedDleg(IEnumerable<KeyValuePair<int,string>> mapping);
+	public delegate void ActionAssignmentChangedDleg(IEnumerable<KeyValuePair<int, string>> mapping);
 
     public interface IModel
     {
@@ -30,15 +30,15 @@ namespace Skeleton
 		void Input(string controlCmd);
         IPresenter GetPresent();
 
-		event ActionAssignmentChangedDleg ActionMapAssigned;
+		event ActionAssignmentChangedDleg ActionsAssigned;
     }
 
 	public abstract class BaseModel : IModel
 	{
 		protected List<string> m_controlCmdQueue = new List<string>();
-		protected Dictionary<int, string> m_actionMap = new Dictionary<int, string>();
+		protected Dictionary<int, string> m_actionAssignment = new Dictionary<int, string>();
 
-		public event ActionAssignmentChangedDleg ActionMapAssigned;
+		public event ActionAssignmentChangedDleg ActionsAssigned;
 
 
 		public virtual void Init(AABB worldBox) { }
@@ -66,21 +66,28 @@ namespace Skeleton
 				m_controlCmdQueue.Add(controlCmd);
 		}
 
-		public void RegisterAction(int actionReg, string command)
+		public Dictionary<int, string> GetActionAssignment()
 		{
-			m_actionMap[actionReg] = command;
-			FireActionMapAssigned(m_actionMap);
-		}
-		public Dictionary<int, string> GetActionMap()
-		{
-			return m_actionMap;
+			return m_actionAssignment;
 		}
 
-		protected void FireActionMapAssigned(IEnumerable<KeyValuePair<int,string>> mapping)
+		protected void AssignAction(int actionNum, string command)
 		{
-			if (ActionMapAssigned != null)
+			m_actionAssignment[actionNum] = command;
+			FireActionsAssigned(m_actionAssignment);
+		}
+
+		protected void AssignAllAction(IEnumerable<KeyValuePair<int, string>> mapping)
+		{
+			m_actionAssignment = mapping.ToDictionary(kv => kv.Key, kv => kv.Value);
+			FireActionsAssigned(m_actionAssignment);
+		}
+
+		protected void FireActionsAssigned(IEnumerable<KeyValuePair<int,string>> mapping)
+		{
+			if (ActionsAssigned != null)
 			{
-				ActionMapAssigned(mapping);
+				ActionsAssigned(mapping);
 			}
 		}
 	}

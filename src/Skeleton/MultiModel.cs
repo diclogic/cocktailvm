@@ -17,7 +17,7 @@ namespace Skeleton
 		{
 			m_worldBox = worldBox;
 
-			RegisterAction(1, "load Demos.DistributedAccountingDemo");
+			AssignAction(1, "load Demos.NumericalDemo");
 		}
 
 		public override void Update(IRenderer renderer, double time, IEnumerable<string> controlCmds)
@@ -54,11 +54,6 @@ namespace Skeleton
 			var existingModel = m_modelCache.FirstOrDefault(m => m.GetType() == type);
 			if (existingModel != null)
 			{
-				if (existingModel == m_currentModel)
-					return;
-
-				m_currentModel.ActionMapAssigned -= OnSubmodelActionMapAssigned;
-				existingModel.ActionMapAssigned += OnSubmodelActionMapAssigned;
 				existingModel.Init(m_worldBox);
 				m_currentModel = existingModel;
 				return;
@@ -68,7 +63,7 @@ namespace Skeleton
 			if (newModel == null)
 				throw new ApplicationException(string.Format("The given class is not inherited from IModel: {0}", type.FullName));
 
-			newModel.ActionMapAssigned += OnSubmodelActionMapAssigned;
+			newModel.ActionsAssigned += OnSubmodelActionAssigned;
 			newModel.Init(m_worldBox);
 			m_modelCache.Add(newModel);
 			m_currentModel = newModel;
@@ -80,12 +75,12 @@ namespace Skeleton
 				return;
 
 			var idx = m_modelCache.FindIndex(m => m.GetType().FullName == hint);
-			if (idx == -1)
-				return;
+			m_modelCache[idx].ActionsAssigned -= OnSubmodelActionAssigned;
 
-			var model = m_modelCache[idx];
-			model.ActionMapAssigned -= OnSubmodelActionMapAssigned;
-			m_modelCache.RemoveAt(idx);
+			if (idx != -1)
+				m_modelCache.RemoveAt(idx);
+
+			FireActionsAssigned(GetActionAssignment());
 		}
 
 		public override IPresenter GetPresent()
@@ -96,9 +91,9 @@ namespace Skeleton
 			return m_currentModel.GetPresent();
 		}
 
-		private void OnSubmodelActionMapAssigned(IEnumerable<KeyValuePair<int, string>> mapping)
+		private void OnSubmodelActionAssigned(IEnumerable<KeyValuePair<int, string>> mapping)
 		{
-			FireActionMapAssigned(mapping.Union(this.GetActionMap()));
+			FireActionsAssigned(mapping.Union(GetActionAssignment()));
 		}
 
 		private class NullPresenter : IPresenter
