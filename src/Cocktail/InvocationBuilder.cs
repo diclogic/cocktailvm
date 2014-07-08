@@ -30,11 +30,16 @@ namespace Cocktail
 
 
 			// module creation
-			var module = CreateModule("CocktailInvoker_"+interf.Name);
+			var module = GenerateModule("CocktailInvoker_"+interf.Name);
 
 			// type definition
-			var typeName = string.Format("Proxy_{0}", interf.Name);
-			var typeBuilder = module.DefineType(typeName, TypeAttributes.Public | TypeAttributes.Class);
+			TypeBuilder typeBuilder;
+			{
+				var typeName = string.Format("Proxy_{0}", interf.Name);
+				typeBuilder = module.DefineType(typeName, TypeAttributes.Public | TypeAttributes.Class);
+			}
+
+			// declare interface
 			typeBuilder.AddInterfaceImplementation(interf);
 
 			// constructor
@@ -47,92 +52,94 @@ namespace Cocktail
 			// methods
 			foreach (var ifMethod in interf.GetMethods())
 			{
-				//void Deposit(Spacetime ST, StateRef account, float amount)
-				//{
-				//    ST.Execute("Deposit", Utils.MakeArgList("account", account), amount);
-				//}
-
-				var ifMethodParams = ifMethod.GetParameters();
-				var loadArgSpacetime = OpCodes.Ldarg_1;
-
-				// Spacetime parameter is no longer needed
-				//if (!typeof(Spacetime).IsAssignableFrom(ifMethodParams.FirstOrDefault().ParameterType))
-				//    throw new JITCompileException("First param must be `Spacetime' or it's subclasses");
-
-				var methodBuilder = typeBuilder.DefineMethod(
-															ifMethod.Name,
-															MethodAttributes.Public | MethodAttributes.Virtual,
-															//CallingConventions.HasThis,
-															ifMethod.ReturnType,
-															ifMethodParams.Select(mp => mp.ParameterType).ToArray());
-
-				var il = methodBuilder.GetILGenerator();
-
-				var stateArgPairsType = typeof(IEnumerable<KeyValuePair<string, StateRef>>);
-
-				// local variables
-				var localVarargs = il.DeclareLocal(typeof(object[]));	// varargs
-				var localStateArgs = il.DeclareLocal(stateArgPairsType);
-
-				//static Utils.MakeArgList()
-				{
-					var stateParams = ifMethodParams.Where(x => x.ParameterType == typeof(StateRef));
-					if (stateParams.FirstOrDefault() == null)
-						throw new JITCompileException(string.Format("Each method must have at least one state. Method name:", ifMethod.Name));
-
-					CreateArray(il, localVarargs, stateParams.Count() * 2);	//< 2 elements per arg
-
-					int idx = 0;
-					foreach (var sp in stateParams)
-					{
-						AddToArray(il, localVarargs, idx, (il2) => il2.Emit(OpCodes.Ldstr, sp.Name));
-						++idx;
-						AddToArray(il, localVarargs, idx, (il2) => il2.Emit(OpCodes.Ldarg, sp.Position + 1));
-						++idx;
-					}
-
-					il.Emit(OpCodes.Ldloc, localVarargs);
-					var methodMakeArgList = typeof(InterpUtils).GetMethod("MakeArgList", new[] { typeof(object[]) });
-					il.EmitCall(OpCodes.Call, methodMakeArgList, null);
-					il.Emit(OpCodes.Stloc, localStateArgs);
-				}
-
-				// ST.Execute(Spacetime, "Deposit", ...
-				// ST.Execute(..., params object[] args)
-				{
-					//il.Emit(loadArgSpacetime);
-					var methodGetWthin = typeof(WithIn).GetMethod("GetWithin", new Type[] {} );
-					il.EmitCall(OpCodes.Call, methodGetWthin, null);
-
-					il.Emit(OpCodes.Ldstr, ifMethod.Name);
-					il.Emit(OpCodes.Ldloc, localStateArgs);
-
-					var constParams = ifMethodParams.Skip(1).Where(x => x.ParameterType != typeof(StateRef));
-
-					CreateArray(il, localVarargs, constParams.Count());
-
-					int idx = 0;
-					foreach (var cp in constParams)
-					{
-						AddToArray(il, localVarargs, idx, (il2) =>
-							{
-								il2.Emit(OpCodes.Ldarg, cp.Position + 1);
-								if (cp.ParameterType.IsValueType)
-									il2.Emit(OpCodes.Box, cp.ParameterType);
-							});
-						++idx;
-					}
-
-					il.Emit(OpCodes.Ldloc, localVarargs);
-					var methodExecute = typeof(Spacetime).GetMethod("Execute", new[] {typeof(string), stateArgPairsType, typeof(object[])});
-					il.EmitCall(OpCodes.Callvirt, methodExecute, null);
-					il.Emit(OpCodes.Pop);	//< we don't use the return value (for now)
-				}
-
-				il.Emit(OpCodes.Ret);
+				GenerateMethod(typeBuilder, ifMethod);
 			}
 
 			return typeBuilder.CreateType();
+		}
+
+		
+		/// <summary>
+		/// the following il code makes something like this:
+		/// void Deposit(StateRef account, float amount)
+		/// {
+		///     WithIn.GetWithin()
+		///         .Execute("Deposit", Utils.MakeArgList("account", account), amount);
+		/// }
+		/// </summary>
+		private static void GenerateMethod(TypeBuilder typeBuilder, MethodInfo ifMethod)
+		{
+			var ifMethodParams = ifMethod.GetParameters();
+
+			var methodBuilder = typeBuilder.DefineMethod(
+														ifMethod.Name,
+														MethodAttributes.Public | MethodAttributes.Virtual,
+														ifMethod.ReturnType,
+														ifMethodParams.Select(mp => mp.ParameterType).ToArray());
+
+			var il = methodBuilder.GetILGenerator();
+
+			var stateArgPairsType = typeof(IEnumerable<KeyValuePair<string, StateRef>>);
+
+			// local variables
+			var localVarargs = il.DeclareLocal(typeof(object[]));	// varargs
+			var localStateArgs = il.DeclareLocal(stateArgPairsType);
+
+			//static Utils.MakeArgList()
+			{
+				var stateParams = ifMethodParams.Where(x => x.ParameterType == typeof(StateRef));
+				if (stateParams.FirstOrDefault() == null)
+					throw new JITCompileException(string.Format("Each method must have at least one state. Method name:", ifMethod.Name));
+
+				CreateArray(il, localVarargs, stateParams.Count() * 2);	//< 2 elements per arg
+
+				int idx = 0;
+				foreach (var sp in stateParams)
+				{
+					AddToArray(il, localVarargs, idx, (il2) => il2.Emit(OpCodes.Ldstr, sp.Name));
+					++idx;
+					AddToArray(il, localVarargs, idx, (il2) => il2.Emit(OpCodes.Ldarg, sp.Position + 1));
+					++idx;
+				}
+
+				il.Emit(OpCodes.Ldloc, localVarargs);
+				var methodMakeArgList = typeof(InterpUtils).GetMethod("MakeArgList", new[] { typeof(object[]) });
+				il.EmitCall(OpCodes.Call, methodMakeArgList, null);
+				il.Emit(OpCodes.Stloc, localStateArgs);
+			}
+
+			// var ST = WithIn.GetWithin();
+			// ST.Execute("Deposit", ..., params object[] args)
+			{
+				var methodGetWthin = typeof(WithIn).GetMethod("GetWithin", new Type[] { });
+				il.EmitCall(OpCodes.Call, methodGetWthin, null);
+
+				il.Emit(OpCodes.Ldstr, ifMethod.Name);
+				il.Emit(OpCodes.Ldloc, localStateArgs);
+
+				var constParams = ifMethodParams.Skip(1).Where(x => x.ParameterType != typeof(StateRef));
+
+				CreateArray(il, localVarargs, constParams.Count());
+
+				int idx = 0;
+				foreach (var cp in constParams)
+				{
+					AddToArray(il, localVarargs, idx, (il2) =>
+						{
+							il2.Emit(OpCodes.Ldarg, cp.Position + 1);
+							if (cp.ParameterType.IsValueType)
+								il2.Emit(OpCodes.Box, cp.ParameterType);
+						});
+					++idx;
+				}
+
+				il.Emit(OpCodes.Ldloc, localVarargs);
+				var methodExecute = typeof(Spacetime).GetMethod("Execute", new[] { typeof(string), stateArgPairsType, typeof(object[]) });
+				il.EmitCall(OpCodes.Callvirt, methodExecute, null);
+				il.Emit(OpCodes.Pop);	//< we don't use the return value (for now)
+			}
+
+			il.Emit(OpCodes.Ret);
 		}
 
 		private static void CreateArray(ILGenerator il, LocalBuilder arr, int size)
@@ -150,7 +157,7 @@ namespace Cocktail
 			il.Emit(OpCodes.Stelem_Ref);
 		}
 
-		private static ModuleBuilder CreateModule(string moduleName)
+		private static ModuleBuilder GenerateModule(string moduleName)
 		{
 			var assemblyName = new AssemblyName(moduleName);
 			var assembly = AppDomain.CurrentDomain.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.Run);
