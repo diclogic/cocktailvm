@@ -6,18 +6,22 @@ using MathLib;
 
 namespace Skeleton
 {
+	public class MultiModelContentAttribute : Attribute { }
+
 	public class MultiModel : BaseModel
 	{
 		private List<BaseModel> m_modelCache = new List<BaseModel>();
 		private BaseModel m_currentModel = null;
 		private AABB m_worldBox = new AABB();
 		private readonly IPresenter m_nullPresenter = new NullPresenter();
+		private List<string> m_modelNames = new List<string>();
+		private int m_loopIndex = -1;
 
 		public override void Init(AABB worldBox)
 		{
 			m_worldBox = worldBox;
-
-			AssignAction(1, "load Demos.NumericalDemo");
+			CollectAllModel();
+			RegisterAction(1, "next");
 		}
 
 		public override void Update(IRenderer renderer, double time, IEnumerable<string> controlCmds)
@@ -29,10 +33,32 @@ namespace Skeleton
 					Load(args[1]);
 				else if (args[0] == "unload")
 					Unload(args[1]);
+				else if (args[0] == "next")
+					Next();
 			}
 
 			if (m_currentModel != null)
 				m_currentModel.Update(renderer, time, controlCmds);
+		}
+
+		private void CollectAllModel()
+		{
+			m_modelNames.Clear();
+
+			foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+				foreach (var type in asm.GetTypes())
+				{
+					if (0 < type.GetCustomAttributes(typeof(MultiModelContentAttribute), false).Length)
+						m_modelNames.Add(type.FullName);
+				}
+		}
+
+		public void Next()
+		{
+			if (m_modelNames.Count <= 0)
+				return;
+
+			Load(m_modelNames[(++m_loopIndex) % m_modelNames.Count]);
 		}
 
 		public void Load(string hint)
@@ -54,6 +80,11 @@ namespace Skeleton
 			var existingModel = m_modelCache.FirstOrDefault(m => m.GetType() == type);
 			if (existingModel != null)
 			{
+				if (existingModel == m_currentModel)
+					return;
+
+				m_currentModel.ActionMapAssigned -= OnSubmodelActionMapAssigned;
+				existingModel.ActionMapAssigned += OnSubmodelActionMapAssigned;
 				existingModel.Init(m_worldBox);
 				m_currentModel = existingModel;
 				return;
@@ -63,7 +94,7 @@ namespace Skeleton
 			if (newModel == null)
 				throw new ApplicationException(string.Format("The given class is not inherited from IModel: {0}", type.FullName));
 
-			newModel.ActionsAssigned += OnSubmodelActionAssigned;
+			newModel.ActionMapAssigned += OnSubmodelActionMapAssigned;
 			newModel.Init(m_worldBox);
 			m_modelCache.Add(newModel);
 			m_currentModel = newModel;
@@ -75,12 +106,12 @@ namespace Skeleton
 				return;
 
 			var idx = m_modelCache.FindIndex(m => m.GetType().FullName == hint);
-			m_modelCache[idx].ActionsAssigned -= OnSubmodelActionAssigned;
+			if (idx == -1)
+				return;
 
-			if (idx != -1)
-				m_modelCache.RemoveAt(idx);
-
-			FireActionsAssigned(GetActionAssignment());
+			var model = m_modelCache[idx];
+			model.ActionMapAssigned -= OnSubmodelActionMapAssigned;
+			m_modelCache.RemoveAt(idx);
 		}
 
 		public override IPresenter GetPresent()
@@ -91,9 +122,9 @@ namespace Skeleton
 			return m_currentModel.GetPresent();
 		}
 
-		private void OnSubmodelActionAssigned(IEnumerable<KeyValuePair<int, string>> mapping)
+		private void OnSubmodelActionMapAssigned(IEnumerable<KeyValuePair<int, string>> mapping)
 		{
-			FireActionsAssigned(mapping.Union(GetActionAssignment()));
+			FireActionMapAssigned(mapping.Union(this.GetActionMap()));
 		}
 
 		private class NullPresenter : IPresenter

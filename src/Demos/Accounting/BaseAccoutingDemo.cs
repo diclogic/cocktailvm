@@ -47,13 +47,13 @@ namespace Demos
 			{
 				var initialST = new Spacetime(m_idFactory.CreateFromRoot(), ITCEvent.CreateZero(), m_idFactory);
 				var secondST = new Spacetime(m_idFactory.CreateFromRoot(), ITCEvent.CreateZero(), m_idFactory);
-				m_spacetimes.AddRange(new [] { initialST, secondST });
+				m_spacetimes.AddRange(new[] { initialST, secondST });
 			}
 
 			// fake the globally existing SyncManager
 			PseudoSyncMgr.Instance.Initialize(m_vmST);
-			foreach(var ST in m_spacetimes)
-					PseudoSyncMgr.Instance.RegisterSpaceTime(ST);
+			foreach (var ST in m_spacetimes)
+				PseudoSyncMgr.Instance.RegisterSpaceTime(ST);
 
 			// must pull new VM to use IAccounting
 			foreach (var ST in m_spacetimes)
@@ -130,7 +130,7 @@ namespace Demos
 				foreach (var p in m_accounts.Select(acc => (float)acc.Fields.Find(f => f.Name == "Balance").Value))
 				{
 					GL.Color4(Color4.DarkRed);
-					DrawBar(m_accounts.Length*2, index*2, Math.Min(p, MAX_AMOUNT) / MAX_AMOUNT);
+					DrawBar(m_accounts.Length * 2, index * 2, Math.Min(p, MAX_AMOUNT) / MAX_AMOUNT);
 					++index;
 				}
 				GL.End();
@@ -160,4 +160,4 @@ namespace Demos
 
 		}
 	}
-	}
+}

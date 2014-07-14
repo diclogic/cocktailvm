@@ -9,6 +9,7 @@ using Skeleton;
 
 namespace Demos
 {
+	[MultiModelContent]
 	public class ConstrainedAccountingDemo : BaseAccountingDemo
 	{
 		protected override void UpdateWorld(float interval)
@@ -39,19 +40,18 @@ namespace Demos
 
 			SyncSpacetimes();
 		}
+
 		public override IPresenter GetPresent()
 		{
-			return new Present2(m_accounts.Select( acc => (MonitoredAccount)acc), m_worldBox);
+			return new Present(m_accounts.Select( acc => (MonitoredAccount)acc), m_worldBox);
 		}
 
-		// this works only because the two states has the key field with same name (Balance)
-		public class Present2 : Present
+		protected class Present : BaseAccountingDemo.Present
 		{
-			public Present2(IEnumerable<MonitoredAccount> accounts, AABB worldBox)
+			public Present(IEnumerable<MonitoredAccount> accounts, AABB worldBox)
 				:base(accounts.Select(a => a.Snapshot()).ToArray(), worldBox)
 			{
 			}
 		}
-
 	}
 }
