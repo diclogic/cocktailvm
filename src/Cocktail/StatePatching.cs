@@ -13,7 +13,7 @@ namespace Cocktail
 	public enum StatePatchMethod
 	{
 		Auto,
-		Customized,
+		Customized,		// the state defines how it should be patched
 	}
 
 	[Flags]

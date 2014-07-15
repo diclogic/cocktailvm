@@ -19,6 +19,16 @@ namespace DOA
 
 		private PseudoSyncMgr() { }
 
+		public void Reset()
+		{
+			lock (m_lock)
+			{
+				m_vmST = null;
+				m_vmStateId = new TStateId();
+				m_spaceTimes.Clear();
+			}
+		}
+
 		public void RegisterSpaceTime(Spacetime st)
 		{
 			lock (m_lock)

@@ -128,7 +128,7 @@ namespace Skeleton
             update_watch.Start();
             render_watch.Start();
 
-            GL.ClearColor(Color.MidnightBlue);
+			GL.ClearColor(Color.FromArgb(45, 45, 45));
             GL.Enable(EnableCap.DepthTest);
             GL.Enable(EnableCap.PointSmooth);
 

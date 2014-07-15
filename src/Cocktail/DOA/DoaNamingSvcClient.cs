@@ -56,5 +56,10 @@ namespace DOA
 
 			return null;
 		}
+
+		public void Reset()
+		{
+			m_objects.Clear();
+		}
 	}
 }

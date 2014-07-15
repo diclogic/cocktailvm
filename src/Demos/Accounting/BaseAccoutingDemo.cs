@@ -19,11 +19,10 @@ namespace Demos
 		protected List<State> m_accounts = new List<State>();
 		protected AABB m_worldBox;
 		protected double m_accumulate = 0;
-		protected Random m_rand = new Random();
-		protected VMSpacetime m_vmST;
 		protected List<Spacetime> m_spacetimes = new List<Spacetime>();
-		protected IHIdFactory m_idFactory = HIdService.GetFactory();
-		protected NamingSvcClient m_namingSvc = NamingSvcClient.Instance;
+		protected IHIdFactory m_idFactory;
+		protected VMSpacetime m_vmST;
+		protected NamingSvcClient m_namingSvc;
 		protected IAccounting m_accountingInvoker;
 
 		// trivial
@@ -31,18 +30,24 @@ namespace Demos
 
 		public BaseAccountingDemo()
 		{
+			// reset all global states, to allow model switching
+			NamingSvcClient.Instance.Reset();
+			HIdService.Reset();
+			PseudoSyncMgr.Instance.Reset();
+
+			m_namingSvc = NamingSvcClient.Instance;
 			m_accountingInvoker = InvocationBuilder.Build<IAccounting>();
+			m_idFactory = HIdService.GetFactory();
+			m_vmST = new VMSpacetime(m_idFactory);
 		}
 
 		public override void Init(AABB worldBox)
 		{
 			m_worldBox = worldBox;
+			if (!m_vmST.VMExist(typeof(IAccounting)))
+				throw new ApplicationException("Accounting functions are not declared in VM yet");
 
-			m_vmST = new VMSpacetime(m_idFactory);
-
-			// bind an invocation interface to an implementation
-			m_vmST.VMBind(typeof(IAccounting), typeof(ConstrainedAccounting));
-
+			// --- init demo objects ---
 
 			{
 				var initialST = new Spacetime(m_idFactory.CreateFromRoot(), ITCEvent.CreateZero(), m_idFactory);
@@ -61,15 +66,18 @@ namespace Demos
 
 
 			// create 2 accounts
+			for (int ii = 0; ii < 2; ++ii)
+			{
+				var newAccount = m_spacetimes[ii].CreateState((st, stamp) => AccountFactory(st, stamp, ii));
+				m_namingSvc.RegisterObject(newAccount.StateId.ToString(), newAccount.GetType().ToString(), newAccount);
+				m_accounts.Add(newAccount);
+			}
+
+			// deposit some initial money
 			using (new WithIn(m_spacetimes[0]))
 			{
-				for (int ii = 0; ii < 2; ++ii)
-				{
-					var newAccount = m_spacetimes[ii].CreateState((st, stamp) => AccountFactory(st, stamp, ii));
-					m_namingSvc.RegisterObject(newAccount.StateId.ToString(), newAccount.GetType().ToString(), newAccount);
-					m_accounts.Add(newAccount as Account);
-					m_accountingInvoker.Deposit(GenRemoteRef(newAccount), 900.0f);
-				}
+				foreach (var acc in m_accounts)
+					m_accountingInvoker.Deposit(GenRemoteRef(acc), 900.0f);
 			}
 
 			// initial chronon
@@ -95,14 +103,6 @@ namespace Demos
 			m_elapsed += dt;
 			m_accumulate += dt;
 
-			foreach (var cmd in controlCmds)
-			{
-				var args = cmd.Split(' ');
-				if (args.Length > 0 && args[0] == "action")
-				{
-				}
-			}
-
 			while (m_accumulate > UpdateInterval)
 			{
 				m_accumulate -= UpdateInterval;
@@ -110,12 +110,12 @@ namespace Demos
 			}
 		}
 
-		public class Present : BasePresenter
+		protected class Present : BasePresent
 		{
 			StateSnapshot[] m_accounts;
 			readonly AABB m_worldbox;
 
-			protected Present(StateSnapshot[] accounts, AABB worldBox)
+			public Present(StateSnapshot[] accounts, AABB worldBox)
 			{
 				m_accounts = accounts;
 				m_worldbox = worldBox;

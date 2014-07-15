@@ -19,7 +19,7 @@ namespace Demos
             public Vector2 Velocity;
             public Color4 Color;
         }
-        public class PresentMetadata: BasePresenter
+        public class PresentMetadata: BasePresent
         {
             List<Particle> m_particles;
             internal PresentMetadata(List<Particle> particles)
@@ -131,7 +131,7 @@ namespace Demos
         }
 
 
-        public override IPresenter GetPresent()
+        public override IPresent GetPresent()
         {
             return new PresentMetadata(Particles);
         }

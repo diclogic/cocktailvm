@@ -12,6 +12,34 @@ namespace Demos
 	[MultiModelContent]
 	public class ConstrainedAccountingDemo : BaseAccountingDemo
 	{
+		Random m_rand = new Random();
+
+		public override void Init(AABB worldBox)
+		{
+			m_vmST.VMBind(typeof(IAccounting), typeof(ConstrainedAccounting));
+			base.Init(worldBox);
+
+			RegisterAction(2, "collision");
+		}
+
+		public override void Update(IRenderer renderer, double dt, IEnumerable<string> controlCmds)
+		{
+			foreach (var cmd in controlCmds)
+			{
+				var args = cmd.Split(' ');
+				if (args.Length <= 0)
+					continue;
+				switch (args[0])
+				{
+					case "collision":
+						MakeCollision();
+						break;
+				}
+			}
+
+			base.Update(renderer, dt, controlCmds);
+		}
+
 		protected override void UpdateWorld(float interval)
 		{
 			if (m_elapsed > 0.5)
@@ -21,6 +49,7 @@ namespace Demos
 					m_accountingInvoker.Transfer(new LocalStateRef<MonitoredAccount>((MonitoredAccount)m_accounts[0])
 											, GenRemoteRef(m_accounts[1])
 											, (float)(m_rand.Next(100) - 50));
+					SyncSpacetimes();
 				}
 			}
 		}
@@ -29,7 +58,6 @@ namespace Demos
 		{
 			return new MonitoredAccount(TStateId.DebugCreate(111ul * (ulong)index), stamp);
 		}
-
 
 		private void MakeCollision()
 		{
@@ -41,17 +69,10 @@ namespace Demos
 			SyncSpacetimes();
 		}
 
-		public override IPresenter GetPresent()
+		public override IPresent GetPresent()
 		{
-			return new Present(m_accounts.Select( acc => (MonitoredAccount)acc), m_worldBox);
-		}
-
-		protected class Present : BaseAccountingDemo.Present
-		{
-			public Present(IEnumerable<MonitoredAccount> accounts, AABB worldBox)
-				:base(accounts.Select(a => a.Snapshot()).ToArray(), worldBox)
-			{
-			}
+			return new Present(m_accounts.Select(acc => ((MonitoredAccount)acc).Snapshot()).ToArray()
+				, m_worldBox);
 		}
 	}
 }

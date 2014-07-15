@@ -13,7 +13,7 @@ namespace Skeleton
 		private List<BaseModel> m_modelCache = new List<BaseModel>();
 		private BaseModel m_currentModel = null;
 		private AABB m_worldBox = new AABB();
-		private readonly IPresenter m_nullPresenter = new NullPresenter();
+		private readonly IPresent m_nullPresenter = new NullPresent();
 		private List<string> m_modelNames = new List<string>();
 		private int m_loopIndex = -1;
 
@@ -57,6 +57,12 @@ namespace Skeleton
 		{
 			if (m_modelNames.Count <= 0)
 				return;
+
+			if (m_loopIndex >= 0)
+			{
+				var prevName = m_modelNames[m_loopIndex % m_modelNames.Count];
+				Unload(prevName);
+			}
 
 			Load(m_modelNames[(++m_loopIndex) % m_modelNames.Count]);
 		}
@@ -114,7 +120,7 @@ namespace Skeleton
 			m_modelCache.RemoveAt(idx);
 		}
 
-		public override IPresenter GetPresent()
+		public override IPresent GetPresent()
 		{
 			if (m_currentModel == null)
 				return m_nullPresenter;
@@ -125,13 +131,6 @@ namespace Skeleton
 		private void OnSubmodelActionMapAssigned(IEnumerable<KeyValuePair<int, string>> mapping)
 		{
 			FireActionMapAssigned(mapping.Union(this.GetActionMap()));
-		}
-
-		private class NullPresenter : IPresenter
-		{
-			public void PreRender() { }
-			public void Render() { }
-			public void PostRender() { }
 		}
 	}
 }

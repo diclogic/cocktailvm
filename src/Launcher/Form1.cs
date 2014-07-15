@@ -32,9 +32,11 @@ namespace Launcher
 			this.button1.Click += new EventHandler(OnButtonClick);
 			this.button2.Click += new EventHandler(OnButtonClick);
 
+			var args = Environment.GetCommandLineArgs();
+
             m_renderer = new Renderer(this.glControl1);
-			m_model = LoadModel("");
-			m_model.ActionsAssigned += OnActionsAssigned;
+			m_model = LoadModel(args.ElementAtOrDefault(1));
+			m_model.ActionMapAssigned += OnModelActionMapAssigned;
 
             m_renderer.Model = m_model;
 
@@ -50,16 +52,27 @@ namespace Launcher
 
 		private IModel LoadModel(string hint)
 		{
-			string fullname = hint;
+			var demosDll = Assembly.Load(AssemblyName.GetAssemblyName("Demos.dll"));
+
+			string typeName = string.Empty;
 			if (string.IsNullOrEmpty(hint))
+				typeName = typeof(MultiModel).AssemblyQualifiedName;
+			else
 			{
-				fullname = typeof(MultiModel).AssemblyQualifiedName;
-				Assembly.Load(AssemblyName.GetAssemblyName("Demos.dll"));
+				foreach (var tt in demosDll.GetTypes())
+				{
+					if (0 == string.Compare(tt.FullName, hint, true))
+					{
+						typeName = tt.AssemblyQualifiedName;
+						break;
+					}
+				}
 			}
 
-            //m_model = new BounceModel();
-            //m_model = new CollisionDemo();
-			return (IModel)Activator.CreateInstance(Type.GetType(fullname));
+			var modelType = Type.GetType(typeName);
+			if (modelType == null)
+				throw new ApplicationException(string.Format("Can't find model with name: {0}", typeName));
+			return (IModel)Activator.CreateInstance(modelType);
 		}
 
         protected override void OnLoad(EventArgs e)
@@ -73,7 +86,7 @@ namespace Launcher
             base.OnClosing(e);
         }
 
-		protected void OnActionsAssigned(IEnumerable<KeyValuePair<int,string>> mapping)
+		protected void OnModelActionMapAssigned(IEnumerable<KeyValuePair<int,string>> mapping)
 		{
 			m_actions = new Dictionary<int, string>();
 			foreach (var kv in mapping)

@@ -28,7 +28,8 @@ namespace Cocktail
 		public VMState( IHTimestamp stamp)
 			: base(new TStateId(19830602), stamp.ID, stamp.Event, StatePatchMethod.Customized)
 		{
-			m_interpreter = new Interpreter();
+			m_interpreter = new Interpreter();	//< we don't really need one interpreter per VMstate
+												//< interpreter instances can be shared by copy-on-write
 			m_interpreter.DeclareAndLink("Cocktail.DeclareAndLink", typeof(Interpreter).GetMethod("DeclareAndLink_cocktail"));
 		}
 
@@ -36,6 +37,11 @@ namespace Cocktail
 		{
 			m_interpreter.DeclareAndLink(name, methodInfo);
 			RecordMetadata(name, methodInfo);
+		}
+
+		public bool IsDeclared(string name)
+		{
+			return m_interpreter.IsDeclared(name);
 		}
 
 		public void Call(string eventName, IEnumerable<KeyValuePair<string, StateRef>> states, IEnumerable<object> constArgs)

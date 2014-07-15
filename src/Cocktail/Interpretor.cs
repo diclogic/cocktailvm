@@ -141,6 +141,7 @@ namespace Cocktail
 	{
 		public static Interpreter Instance = new Interpreter();
 
+		// TODO: support function overloading
 		Dictionary<string, List<FunctionSignature>> m_declGroups = new Dictionary<string, List<FunctionSignature>>();
 		Dictionary<FunctionSignature, Function> m_functionBodies;
 
@@ -153,6 +154,7 @@ namespace Cocktail
         {
             Declare(name, FunctionForm.From(methodInfo));
         }
+
 		public void Declare(string name, FunctionForm form)
 		{
             List<FunctionSignature> functionGroup;
@@ -162,6 +164,11 @@ namespace Cocktail
                 m_declGroups.Add(name, functionGroup);
             }
             functionGroup.Add(new FunctionSignature(name, form));
+		}
+
+		public bool IsDeclared(string name)
+		{
+			return m_declGroups.ContainsKey(name);
 		}
 
         public void Link(string name, Function body)

@@ -15,6 +15,14 @@ namespace Demos
 	[MultiModelContent]
 	public class DistributedAccountingDemo : BaseAccountingDemo
 	{
+		Random m_rand = new Random();
+
+		public override void Init(AABB worldBox)
+		{
+			m_vmST.VMBind(typeof(IAccounting), typeof(Accounting));
+			base.Init(worldBox);
+		}
+
 		protected override void UpdateWorld(float interval)
 		{
 			if (m_elapsed < 0.5)
@@ -30,20 +38,13 @@ namespace Demos
 
 		protected override State AccountFactory(Spacetime st, IHTimestamp stamp, int index)
 		{
-			return new Account(TStateId.DebugCreate(111), stamp);
+			return new Account(TStateId.DebugCreate(111ul * (ulong)index), stamp);
 		}
 
-		public override IPresenter GetPresent()
+		public override IPresent GetPresent()
 		{
-			return new Present(m_accounts.Select(st => (Account)st), m_worldBox);
-		}
-
-		public class Present : BaseAccountingDemo.Present
-		{
-			public Present(IEnumerable<Account> accounts, AABB worldBox)
-				:base(accounts.Select(a => PseudoSyncMgr.Instance.AggregateDistributedDelta(a.StateId)).ToArray(), worldBox)
-			{
-			}
+			return new Present(m_accounts.Select(a => PseudoSyncMgr.Instance.AggregateDistributedDelta(a.StateId)).ToArray()
+							, m_worldBox);
 		}
 	}
 }

@@ -22,6 +22,26 @@ namespace Cocktail
 			DOA.NamingSvcClient.Instance.RegisterObject(VMStateId.ToString(), m_vm.GetType().FullName, m_vm);
 		}
 
+		public bool VMExist(Type interf)
+		{
+			if (!interf.IsInterface)
+				throw new RuntimeException(string.Format("Exist(): the provided type {0} is not an interface"
+										, interf.FullName));
+
+			foreach (var m in interf.GetMethods())
+			{
+				if (!VMExist(m.Name))
+					return false;
+			}
+
+			return true;
+		}
+
+		public bool VMExist(string funcName)
+		{
+			return m_vm.IsDeclared(funcName);
+		}
+
 		public void VMBind(Type interf, Type impl)
 		{
 			if (!interf.IsInterface || !impl.IsClass)

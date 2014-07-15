@@ -8,6 +8,7 @@ using MathLib;
 
 using itc = itcsharp;
 using System.Diagnostics;
+using System.Threading;
 
 
 ///
@@ -35,15 +36,21 @@ namespace Cocktail.HTS
 
     public static class HIdService
     {
-        private static IHIdFactory m_factory;
+		private static IHIdFactory m_factory = null;
         static HIdService()
         {
-            m_factory = new ITCIdentityFactory();
         }
         public static IHIdFactory GetFactory()
         {
+            var newVal = new ITCIdentityFactory();
+			var oldVal = Interlocked.CompareExchange(ref m_factory, newVal, null);
             return m_factory;
         }
+
+		public static void Reset()
+		{
+			m_factory = null;
+		}
     }
 
     internal class ITCIdentity : IHId

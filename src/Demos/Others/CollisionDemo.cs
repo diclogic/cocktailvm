@@ -76,7 +76,7 @@ namespace Demos
             }
         }
 
-        public class Present : BasePresenter
+        public class Present : BasePresent
         {
             Particle[] m_particles;
             public Present(List<Particle> pts)
@@ -96,7 +96,7 @@ namespace Demos
                 GL.End();
             }
         }
-        public override IPresenter GetPresent()
+        public override IPresent GetPresent()
         {
             return new Present(m_particles);
         }
