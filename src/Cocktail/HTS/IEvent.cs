@@ -77,6 +77,7 @@ namespace Cocktail.HTS
 			{
 				for (int ii = 0; ii < (1 << (maxDepth - depth)); ++ii )
 					sb.AppendFormat("{0}|", baseVal + _event.N);
+				sb.Remove(sb.Length - 1, 1);	//< valid even if maxDepth - depth == 0
 			}
 			else
 			{

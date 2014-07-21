@@ -8,7 +8,6 @@ using OpenTK;
 using OpenTK.Graphics.OpenGL;
 using OpenTK.Graphics;
 using Skeleton;
-using Demos;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Reflection;

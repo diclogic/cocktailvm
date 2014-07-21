@@ -17,7 +17,7 @@
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
+    <OutputPath>..\..\lib\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -61,6 +61,10 @@
     <Compile Include="WithIn.cs" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Core\Cocktail.System\Cocktail.System.csproj">
+      <Project>{4C9E24DA-5B89-4785-889A-15AC228598AD}</Project>
+      <Name>Cocktail.System</Name>
+    </ProjectReference>
     <ProjectReference Include="..\ITCSharp\ITCSharp.csproj">
       <Project>{D42AA6CC-660E-48BA-921D-63BA35847DD1}</Project>
       <Name>ITCSharp</Name>

@@ -10,6 +10,7 @@ using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Reflection;
 using System.Collections.Concurrent;
+using Core.Aux.System;
 
 using SnapshotPair = itcsharp.Pair<Cocktail.State,Cocktail.StateSnapshot>;
 using System.Diagnostics;
@@ -514,6 +515,8 @@ namespace Cocktail
 			if (oldVal != null)
 				return null;
 
+			Log.Info("[chronon] Begin {0}: {1}", retval.ID.ToString(), retval.Event.ToString());
+
 			// pull don't necessarily have event increment on local component as long as the final result event is identifiable (by the component of external ST)
 			return retval.Event;
 		}
@@ -537,10 +540,13 @@ namespace Cocktail
 			redo.Rev = evtFinal;
 			m_RedoList.Add(redo);
 			//}
+
+			//Log.Info("[chronon] Commit {0}: {1} => {2}", m_currentTime.ID.ToString(), evtOriginal.ToString(), evtFinal.ToString());
         }
 
 		private void AbortChronon()
 		{
+			//Log.Info("[chronon] Abort {0}: {1}", m_currentTime.ID, m_executingEvent.ToString());
 			Interlocked.Exchange(ref m_executingEvent, null);
 		}
 

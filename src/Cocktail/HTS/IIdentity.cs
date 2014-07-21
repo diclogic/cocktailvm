@@ -151,6 +151,7 @@ namespace Cocktail.HTS
 			{
 				for (int ii = 0; ii < (1 << (maxDepth - depth)); ++ii )
 					sb.AppendFormat("{0}|", (id.IsOne() ? 1 : 0));
+				sb.Remove(sb.Length - 1, 1); //< valid even if maxDepth - depth == 0
 			}
 			else
 			{
