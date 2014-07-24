@@ -99,10 +99,6 @@
     </Compile>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Core\Cocktail.System\Cocktail.System.csproj">
-      <Project>{4C9E24DA-5B89-4785-889A-15AC228598AD}</Project>
-      <Name>Cocktail.System</Name>
-    </ProjectReference>
     <ProjectReference Include="..\Demos\Demos.csproj">
       <Project>{C318BDB0-D222-47E4-8839-017459FE48F2}</Project>
       <Name>Demos</Name>

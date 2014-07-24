@@ -14,3 +14,5 @@ bin/Debug/*.vshost.exe.*
 bin/Debug/OpenTK.GLControl.xml
 bin/Debug/OpenTK.xml
 bin/Debug/*.log
+bin/Debug/xunit.xml
+bin/Debug/xunit.extensions.xml
