@@ -73,14 +73,8 @@ namespace Cocktail.HTS
 		{
 			var maxDepth = Math.Max(m_impl.ID.GetMaxDepth(), m_impl.Event.MaxDepth());
 
-			var sb = new StringBuilder();
-			ITCIdentity.RecursiveDebugString(sb, m_impl.ID, 0, maxDepth);
-			var idStr = sb.ToString();
-
-			sb.Clear();
-			ITCEvent.RecursiveDebugString(sb, m_impl.Event, 0, 0, maxDepth);
-			var eventStr = sb.ToString();
-
+			var idStr = m_IdCache.ToDebugString(maxDepth);
+			var eventStr = m_EventCache.ToDebugString(maxDepth);
 			return string.Format("[({0})|({1})]", idStr, eventStr);
 		}
     }

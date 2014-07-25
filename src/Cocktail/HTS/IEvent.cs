@@ -13,6 +13,8 @@ namespace Cocktail.HTS
 		/// </summary>
         bool KnownBy(IHEvent rhs);
 		IHEvent Advance(IHId id);
+		string ToDebugString();
+		string ToDebugString(int maxDepth);
     }
 
 	internal class ITCEventComparer : IComparer<IHEvent>
@@ -62,22 +64,28 @@ namespace Cocktail.HTS
 
 		public override string ToString()
 		{
-			return GetDebugString();
+			return ToDebugString();
 		}
-		public string GetDebugString()
+
+		public string ToDebugString()
+		{
+			return ToDebugString(m_impl.MaxDepth());
+		}
+
+		public string ToDebugString(int maxDepth)
 		{
 			var sb = new StringBuilder();
-			RecursiveDebugString(sb, m_impl, 0, 0, m_impl.MaxDepth());
+			RecursiveDebugString(sb, m_impl, 0, 0, maxDepth);
+			sb.Remove(sb.Length - 1, 1);	//< valid even if maxDepth - depth == 0
 			return sb.ToString();
 		}
 
-		public static void RecursiveDebugString(StringBuilder sb, itc.Event _event, int baseVal, int depth, int maxDepth)
+		private static void RecursiveDebugString(StringBuilder sb, itc.Event _event, int baseVal, int depth, int maxDepth)
 		{
 			if (_event.IsSimplex())
 			{
 				for (int ii = 0; ii < (1 << (maxDepth - depth)); ++ii )
 					sb.AppendFormat("{0}|", baseVal + _event.N);
-				sb.Remove(sb.Length - 1, 1);	//< valid even if maxDepth - depth == 0
 			}
 			else
 			{

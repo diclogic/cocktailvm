@@ -19,7 +19,8 @@ namespace Cocktail.HTS
 {
     public interface IHId : IComparable
     {
-
+		string ToDebugString();
+		string ToDebugString(int maxDepth);
     }
 
     public interface IHIdFactory
@@ -134,24 +135,28 @@ namespace Cocktail.HTS
 
 		public override string ToString()
 		{
-			return GetDebugString();
+			return ToDebugString();
 		}
 
-		public string GetDebugString()
+		public string ToDebugString()
 		{
+			return ToDebugString(m_impl.GetMaxDepth());
+		}
 
+		public string ToDebugString(int maxDepth)
+		{
 			var sb = new StringBuilder();
-			RecursiveDebugString(sb, m_impl, 0, m_impl.GetMaxDepth());
+			RecursiveDebugString(sb, m_impl, 0, maxDepth);
+			sb.Remove(sb.Length - 1, 1); //< valid even if maxDepth - depth == 0
 			return sb.ToString();
 		}
 
-		public static void RecursiveDebugString(StringBuilder sb, itc.Identity id, int depth, int maxDepth)
+		private static void RecursiveDebugString(StringBuilder sb, itc.Identity id, int depth, int maxDepth)
 		{
 			if (id.IsSimplex())
 			{
 				for (int ii = 0; ii < (1 << (maxDepth - depth)); ++ii )
 					sb.AppendFormat("{0}|", (id.IsOne() ? 1 : 0));
-				sb.Remove(sb.Length - 1, 1); //< valid even if maxDepth - depth == 0
 			}
 			else
 			{

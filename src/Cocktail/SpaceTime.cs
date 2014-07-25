@@ -515,7 +515,7 @@ namespace Cocktail
 			if (oldVal != null)
 				return null;
 
-			Log.Info("[chronon] Begin {0}: {1}", retval.ID.ToString(), retval.Event.ToString());
+			Log.Info(Log.CHRONON, "[{0}] Begin {1}", retval.ID.ToString(), retval.Event.ToString());
 
 			// pull don't necessarily have event increment on local component as long as the final result event is identifiable (by the component of external ST)
 			return retval.Event;
@@ -541,12 +541,12 @@ namespace Cocktail
 			m_RedoList.Add(redo);
 			//}
 
-			//Log.Info("[chronon] Commit {0}: {1} => {2}", m_currentTime.ID.ToString(), evtOriginal.ToString(), evtFinal.ToString());
+			Log.Info(Log.CHRONON, "[{0}] Commit {1} => {2}", m_currentTime.ID.ToString(), evtOriginal.ToString(), evtFinal.ToString());
         }
 
 		private void AbortChronon()
 		{
-			//Log.Info("[chronon] Abort {0}: {1}", m_currentTime.ID, m_executingEvent.ToString());
+			Log.Info(Log.CHRONON, "[{0}] Abort {1}", m_currentTime.ID, m_executingEvent.ToString());
 			Interlocked.Exchange(ref m_executingEvent, null);
 		}
 

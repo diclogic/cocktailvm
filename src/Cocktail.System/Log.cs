@@ -16,6 +16,8 @@ namespace Core.Aux.System
 	{
 		private static readonly log4net.ILog log = log4net.LogManager.GetLogger("Core.Aux.System.Log");
 
+		public static readonly string CHRONON = "CHRONON";
+
 		public static void Error(string format, params object[] args)
 		{
 			log.ErrorFormat(format, args);
@@ -26,8 +28,9 @@ namespace Core.Aux.System
 			log.WarnFormat(format, args);
 		}
 
-		public static void Info(string format, params object[] args)
+		public static void Info(string group, string format, params object[] args)
 		{
+			var log = LogManager.GetLogger(group);
 			log.InfoFormat(format, args);
 		}
 	}
