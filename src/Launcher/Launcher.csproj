@@ -11,7 +11,8 @@
     <RootNamespace>Launcher</RootNamespace>
     <AssemblyName>Launcher</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
-    <TargetFrameworkProfile>Client</TargetFrameworkProfile>
+    <TargetFrameworkProfile>
+    </TargetFrameworkProfile>
     <FileAlignment>512</FileAlignment>
     <PublishUrl>publish\</PublishUrl>
     <Install>true</Install>
@@ -88,6 +89,7 @@
       <DependentUpon>Resources.resx</DependentUpon>
       <DesignTime>True</DesignTime>
     </Compile>
+    <None Include="app.config" />
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>
@@ -99,6 +101,10 @@
     </Compile>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Cocktail.System\Cocktail.System.csproj">
+      <Project>{4C9E24DA-5B89-4785-889A-15AC228598AD}</Project>
+      <Name>Cocktail.System</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Demos\Demos.csproj">
       <Project>{C318BDB0-D222-47E4-8839-017459FE48F2}</Project>
       <Name>Demos</Name>
@@ -110,10 +116,6 @@
     <ProjectReference Include="..\MathLib\MathLib.csproj">
       <Project>{B6DCD891-699A-4E04-98BA-565C9C7D8A64}</Project>
       <Name>MathLib</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\Cocktail\Cocktail.csproj">
-      <Project>{EDC79724-FBA0-4FD4-8EAD-6DC042175DCF}</Project>
-      <Name>Cocktail</Name>
     </ProjectReference>
     <ProjectReference Include="..\Skeleton\Skeleton.csproj">
       <Project>{9DD077F4-2628-477A-82D3-8738EB24B29B}</Project>
