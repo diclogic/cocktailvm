@@ -49,14 +49,14 @@ namespace DOA
 			}
 		}
 
-		internal PrePullResult PrePullRequest(IHId idPuller, IHId idRequester, IHEvent evtOriginal, IEnumerable<TStateId> affectedStates)
+		internal PrePullRequestResult PrePullRequest(IHId idPuller, IHId idRequester, IHEvent evtOriginal, IEnumerable<TStateId> affectedStates)
 		{
 			return m_spaceTimes[idPuller].PrePullRequest(idRequester, evtOriginal, affectedStates);
 		}
 
-		public bool SyncPullRequest(IHId idPuller, IHId idRequester, IHEvent foreignExpectedEvent, ILookup<TStateId, StatePatch> affectedStates)
+		public bool PullRequest(IHId idPuller, IHId idRequester, IHEvent foreignExpectedEvent, ILookup<TStateId, StatePatch> affectedStates)
 		{
-			return m_spaceTimes[idPuller].SyncPullRequest(idRequester, foreignExpectedEvent, affectedStates);
+			return m_spaceTimes[idPuller].PullRequest(idRequester, foreignExpectedEvent, affectedStates);
 		}
 
 		public StateSnapshot AggregateDistributedDelta(IEnumerable<IHId> STIDs, TStateId state)

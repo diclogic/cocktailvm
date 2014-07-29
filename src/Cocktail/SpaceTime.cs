@@ -55,11 +55,12 @@ namespace Cocktail
 		}
 	}
 
-	public enum PrePullResult
+	public enum PrePullRequestResult
 	{
-		Failed,
+		Locked,						//< already locked by someone else
 		Succeeded,
-		NoLocking,
+		SucceededButRequireSync,	//< the PullRequester don't have the latest revision of the requestee
+		NoLocking,					//< no need to lock
 	}
 
     /// <summary>
@@ -99,7 +100,7 @@ namespace Cocktail
 		private object m_executionLock = new object();
 		private SortedList<IHEvent, ExecutionFraction> m_incomingExecutions = new SortedList<IHEvent, ExecutionFraction>();
 		private IHEvent m_executingEvent;
-		private bool m_isWaitingForPullRequest = false;
+		private IHId m_pullRequestedBy = null;
 		protected VMState m_vm;
 
 		public IHId ID { get { return m_currentTime.ID; } }
@@ -363,7 +364,7 @@ namespace Cocktail
 				var requestedSTIDs = new List<IHId>();
 				foreach (var fst in pulledSTs)
 				{
-					bApproved &= PseudoSyncMgr.Instance.SyncPullRequest(fst.Key, this.ID, evtFinal, redo.LocalChanges.Where(kv => fst.Contains(kv.Key)).ToLookup(kv => kv.Key, kv => kv.Value));
+					bApproved &= PseudoSyncMgr.Instance.PullRequest(fst.Key, this.ID, evtFinal, redo.LocalChanges.Where(kv => fst.Contains(kv.Key)).ToLookup(kv => kv.Key, kv => kv.Value));
 					requestedSTIDs.Add(fst.Key);
 				}
 
@@ -431,10 +432,18 @@ namespace Cocktail
 					return (0 == (state.GetPatchFlag() & PatchFlag.CommutativeBit));
 				}).GroupBy(kv => kv.Key, kv => kv.Value);
 
-			// because we know who is involved, we can give headsup to them beforehand
+			// we assume both read and write operations on STs that involved
+			// TODO: support RO STs
+
+			// And because we know who is going to be written/PullRequested, we can give heads-up to them beforehand
 			foreach (var st in pulledSTs)
-				if (PrePullResult.Failed == PseudoSyncMgr.Instance.PrePullRequest(st.Key, this.ID, evtOriginal, st))
-					throw new ApplicationException("Failed to lock foreign ST");
+			{
+				var ret = PseudoSyncMgr.Instance.PrePullRequest(st.Key, this.ID, evtOriginal, st);
+				if (ret >= PrePullRequestResult.Succeeded)
+					continue;
+
+				throw new ApplicationException("Failed to lock foreign ST");
+			}
 
 			IHTimestamp failingST = null;
 			foreach (var st in foreignSTs)
@@ -449,7 +458,7 @@ namespace Cocktail
 			return (failingST == null);
 		}
 
-		// TODO: the operation should not change spacetime data because it's not committed yet
+		// TODO: the operation should not change the current spacetime's data because it's not committed yet
 		private bool DoPullFrom(IHTimestamp foreignStamp, ILookup<TStateId, StatePatch> redos, ref IHEvent expectingEvent)
 		{
 			var expectingEventCopy = expectingEvent;
@@ -559,30 +568,32 @@ namespace Cocktail
 
 		#endregion
 
-		internal PrePullResult PrePullRequest(IHId idRequester, IHEvent evtOriginal, IEnumerable<TStateId> affectedStates)
+		internal PrePullRequestResult PrePullRequest(IHId idRequester, IHEvent evtOriginal, IEnumerable<TStateId> affectedStates)
 		{
 			if (affectedStates.FirstOrDefault().Equals(default(TStateId)))
-				return PrePullResult.NoLocking;
+				return PrePullRequestResult.NoLocking;
 
 			// Currently we lock whole ST
-			if (m_isWaitingForPullRequest)
-				throw new ApplicationException("PullRequest lock already locked");
+			// TODO: check states' sync/patch method
+			if (m_pullRequestedBy != null)
+				return PrePullRequestResult.Locked;
 
 			lock (m_executionLock)
 			{
-				m_isWaitingForPullRequest = true;
+				m_pullRequestedBy = idRequester;
 			}
 
-			if (m_currentTime.Event.KnownBy(evtOriginal))
-			{
-				return PrePullResult.Succeeded;
-			}
+			if (!m_currentTime.Event.KnownBy(evtOriginal))
+				return PrePullRequestResult.SucceededButRequireSync;
 
-			return PrePullResult.Failed;
+			return PrePullRequestResult.Succeeded;
 		}
 
-		internal bool SyncPullRequest(IHId idRequester, IHEvent foreignExpectedEvent, ILookup<TStateId,StatePatch> redos)
+		internal bool PullRequest(IHId idRequester, IHEvent foreignExpectedEvent, ILookup<TStateId,StatePatch> redos)
 		{
+			if (m_pullRequestedBy != null && m_pullRequestedBy != idRequester)
+				return false;
+
 			var evtOriginal = BeginChronon();
 			var evtFinal = evtOriginal;
 
@@ -593,7 +604,7 @@ namespace Cocktail
 			if (!bOK)
 				return false;
 
-			m_isWaitingForPullRequest = false;
+			m_pullRequestedBy = null;
 			CommitChronon(evtOriginal, evtFinal, Enumerable.Empty<State>(), redo);
 			return true;
 		}

@@ -6,13 +6,4 @@ Properties/app.manifest
 *.userprefs
 src/SDKs/log4net/
 lib/Debug/
-bin/Debug/*.dll
-bin/Debug/*.pdb
-bin/Debug/*.exe
-bin/Debug/log4net.xml
-bin/Debug/*.vshost.exe.*
-bin/Debug/OpenTK.GLControl.xml
-bin/Debug/OpenTK.xml
-bin/Debug/*.log
-bin/Debug/xunit.xml
-bin/Debug/xunit.extensions.xml
+bin/Debug/
