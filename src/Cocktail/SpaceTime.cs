@@ -341,6 +341,7 @@ namespace Cocktail
 
 			evtFinal = evtFinal.Advance(ID);
 
+			// FIXME: the stateParams somehow won't be resolved to those states of the local ST
 			m_vm.Call(funcName, stateParams, constArgs.ToArray());
 
 			//----- make redo -------

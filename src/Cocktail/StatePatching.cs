@@ -344,14 +344,14 @@ namespace Cocktail
 			if (0 != (patchKind & PatchFlag.SwapBit))
 			{
 				Action<BinaryReader, FieldInfo, object> func;
-				if (!m_fieldDiffDeserializers.TryGetValue(fi.FieldType, out func))
+				if (!m_fieldDeserializers.TryGetValue(fi.FieldType, out func))
 					throw new ApplicationException(string.Format("Unsupported State Field type: {0}", fi.FieldType.FullName));
 				func(reader, fi, host);
 			}
 			else
 			{
 				Action<BinaryReader, FieldInfo, object> func;
-				if (!m_fieldDeserializers.TryGetValue(fi.FieldType, out func))
+				if (!m_fieldDiffDeserializers.TryGetValue(fi.FieldType, out func))
 					throw new ApplicationException(string.Format("Unsupported State Field type: {0}", fi.FieldType.FullName));
 				func(reader, fi, host);
 			}

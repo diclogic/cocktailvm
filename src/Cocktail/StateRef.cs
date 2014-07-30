@@ -77,6 +77,7 @@ namespace Cocktail
 
 		public object GetObject()
 		{
+			// FIXME: stateRef should only resolve to a local state (of a certain ST)
 			var state = NamingSvcClient.Instance.GetObject(StateId.ToString(), m_refType);
 			return state;
 		}
