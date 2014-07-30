@@ -4,6 +4,7 @@ using System.Linq;
 using System.Windows.Forms;
 using Core.Aux.System;
 using System.Threading;
+using Skeleton;
 
 namespace Launcher
 {
@@ -23,7 +24,17 @@ namespace Launcher
             Application.SetCompatibleTextRenderingDefault(false);
 			try
 			{
-				Application.Run(new Form1());
+				var controller = new Controller();
+				var mainWindow = new LauncherWindow(controller);
+				var glWindow = mainWindow.GetGLWindow();
+				var args = Environment.GetCommandLineArgs();
+
+				var loader = new ModelLoader();
+				var model = loader.LoadModel(args.ElementAtOrDefault(1));
+				var renderer = new Renderer(glWindow);
+				controller.Initialize(renderer, model, mainWindow, glWindow);
+
+				Application.Run(mainWindow);
 			}
 			catch (Exception ex)
 			{

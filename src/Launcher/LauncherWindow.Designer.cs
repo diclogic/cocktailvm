@@ -2,7 +2,7 @@
 
 namespace Launcher
 {
-    partial class Form1
+    partial class LauncherWindow
     {
         /// <summary>
         /// Required designer variable.
@@ -33,6 +33,7 @@ namespace Launcher
 			this.button1 = new System.Windows.Forms.Button();
 			this.glControl1 = new OpenTK.GLControl();
 			this.button2 = new System.Windows.Forms.Button();
+			this.button3 = new System.Windows.Forms.Button();
 			this.SuspendLayout();
 			// 
 			// button1
@@ -49,11 +50,7 @@ namespace Launcher
 			this.glControl1.BackColor = System.Drawing.Color.Black;
 			this.glControl1.Location = new System.Drawing.Point(12, 12);
 			this.glControl1.Name = "glControl1";
-			if (Type.GetType("Mono.Runtime")!= null)
-				this.glControl1.Size = new System.Drawing.Size(494, 341);
-			else
-				this.glControl1.Size = new System.Drawing.Size(494, 371);
-
+			this.glControl1.Size = new System.Drawing.Size(494, 371);
 			this.glControl1.TabIndex = 1;
 			this.glControl1.VSync = false;
 			// 
@@ -66,11 +63,21 @@ namespace Launcher
 			this.button2.Text = "button2";
 			this.button2.UseVisualStyleBackColor = true;
 			// 
+			// button3
+			// 
+			this.button3.Location = new System.Drawing.Point(174, 400);
+			this.button3.Name = "button3";
+			this.button3.Size = new System.Drawing.Size(80, 23);
+			this.button3.TabIndex = 3;
+			this.button3.Text = "button3";
+			this.button3.UseVisualStyleBackColor = true;
+			// 
 			// Form1
 			// 
 			this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
 			this.ClientSize = new System.Drawing.Size(526, 433);
+			this.Controls.Add(this.button3);
 			this.Controls.Add(this.button2);
 			this.Controls.Add(this.glControl1);
 			this.Controls.Add(this.button1);
@@ -85,6 +92,7 @@ namespace Launcher
         private System.Windows.Forms.Button button1;
         private OpenTK.GLControl glControl1;
 		private System.Windows.Forms.Button button2;
+		private System.Windows.Forms.Button button3;
     }
 }
 

@@ -145,7 +145,7 @@ namespace Skeleton
                 m_glCtl.SwapBuffers();
             }
 
-            m_glCtl.Context.MakeCurrent(null);
+			//m_glCtl.Context.MakeCurrent(null);
         }
 
         /// <summary>
