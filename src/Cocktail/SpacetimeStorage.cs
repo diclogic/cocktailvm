@@ -57,6 +57,11 @@ namespace Cocktail
 			return m_allStates.Where(kv => ids.Contains(kv.Key)).Select(kv => kv.Value);
 		}
 
+		internal bool HasState(TStateId id)
+		{
+			return null != GetState(id);
+		}
+
 		internal State GetState(TStateId id)
 		{
 			State retval;

@@ -38,7 +38,7 @@ namespace Demos
 
 		protected override State AccountFactory(Spacetime st, IHTimestamp stamp, int index)
 		{
-			return new Account(TStateId.DebugCreate(111ul * (ulong)index), stamp);
+			return new Account(TStateId.DebugCreate(111ul * ((ulong)index + 1)), stamp);
 		}
 
 		public override IPresent GetPresent()

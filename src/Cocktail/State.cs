@@ -110,7 +110,7 @@ namespace Cocktail
 			return Patch(patchCtx.Metadata.FromEvent, patchCtx.Metadata.ToEvent, patchCtx.Metadata.ToRev, patchCtx.DataStream);
 		}
 
-		public bool Patch(IHEvent fromEvent, IHEvent toEvent, long toRev, Stream delta)
+		private bool Patch(IHEvent fromEvent, IHEvent toEvent, long toRev, Stream delta)
 		{
 			if (toEvent.KnownBy(LatestUpdate))
 				throw new ApplicationException(string.Format("Trying to update to an older revision. Current {0}, Applying {1}", Rev, toRev));

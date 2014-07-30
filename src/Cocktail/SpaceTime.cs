@@ -357,6 +357,9 @@ namespace Cocktail
 				redo.LocalChanges.Add(spair.First.StateId, patch);
 			}
 
+			// ---------- commit to local ST ------------
+			CommitChronon(evtOriginal, evtFinal, states, redo);
+
 			//--------- get approve from foreign STs ---------
 			// Send "pull request" (ask them to pull us) to spacetimes whose non-commutative sates we changed
 			{
@@ -372,14 +375,12 @@ namespace Cocktail
 				{
 					//foreach (var stId in pulledSTIds)
 					//    PseudoSyncMgr.Instance.RollbackPullRequest(stId);
-					return false;
+
+					throw new ApplicationException("Because we prepull-request so this can't fail");
 				}
 			}
 
-			// ---------- commit to local ST ------------
-			CommitChronon(evtOriginal, evtFinal, states, redo);
-
-			// Push native changes to spacetimes that are highly depend on us
+			// TODO: Push native changes to spacetimes that are highly depend on us
 
 			return true;
 		}
@@ -424,6 +425,7 @@ namespace Cocktail
 												, IDictionary<IHId, SpacetimeSnapshot> foreignSTs
 												, IHEvent evtOriginal, IHEvent evtFinal)
 		{
+			// excludes commutative states
 			pulledSTs = foreignStateIds.Where(sp =>
 				{
 					var state = foreignSTs[sp.Key].States.FirstOrDefault(s => s.StateId.Equals(sp.Value));
@@ -445,6 +447,19 @@ namespace Cocktail
 				throw new ApplicationException("Failed to lock foreign ST");
 			}
 
+			// Fetch construction info for new states
+			// TODO: currently this is psudo-implementation
+			foreach (var sp in foreignStateIds)
+				if (!m_storageComponent.HasState(sp.Value))
+				{
+					var st = foreignSTs[sp.Key];
+					var stateType = st.States.First(s => s.StateId.Equals(sp.Value)).GetType();
+
+					m_storageComponent.GetOrCreate(sp.Value, () => (State)Activator.CreateInstance(stateType, sp.Value, HTSFactory.Make(sp.Key, ITCEvent.CreateZero()) ));
+				}
+
+
+			// do the actual work
 			IHTimestamp failingST = null;
 			foreach (var st in foreignSTs)
 			{
@@ -479,10 +494,11 @@ namespace Cocktail
 
 				var lst = m_storageComponent.GetOrCreate(fstateId, () =>
 				{
-					State ret;
-					if (!StatePatchUtils.TryCreateFromPatch(foreignStamp.ID, fstateId, firstPatchCtx, out ret))
-						throw new ApplicationException(string.Format("State {0} not found in current ST {1} and the first patch is not constructive patch: {2}", fstateId, ID, patches.First().Flag));
-					return ret;
+					throw new ApplicationException("The caller of this method (DoPullFrom) should have guaranteed the creation of the state");
+					//State ret;
+					//if (!StatePatchUtils.TryCreateFromPatch(foreignStamp.ID, fstateId, firstPatchCtx, out ret))
+					//    throw new ApplicationException(string.Format("State {0} not found in current ST {1} and the first patch is not constructive patch: {2}", fstateId, ID, patches.First().Flag));
+					//return ret;
 				});
 
 				if (!lst.Patch(firstPatchCtx))

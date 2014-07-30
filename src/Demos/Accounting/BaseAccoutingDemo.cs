@@ -9,6 +9,7 @@ using MathLib;
 using OpenTK.Graphics;
 using OpenTK.Graphics.OpenGL;
 using Skeleton;
+using Core.Aux.System;
 
 
 
@@ -90,7 +91,9 @@ namespace Demos
 
 		protected void SyncSpacetimes()
 		{
+			Log.Info("DEMO", "Sync 1 << 0");
 			m_spacetimes[1].PullAllFrom(m_spacetimes[0].Snapshot(m_spacetimes[1].LatestEvent));
+			Log.Info("DEMO", "Sync 0 << 1");
 			m_spacetimes[0].PullAllFrom(m_spacetimes[1].Snapshot(m_spacetimes[0].LatestEvent));
 		}
 
