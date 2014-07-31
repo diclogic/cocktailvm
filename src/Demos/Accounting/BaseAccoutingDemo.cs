@@ -17,7 +17,8 @@ namespace Demos
 {
 	public abstract class BaseAccountingDemo : BaseModel
 	{
-		protected List<State> m_accounts = new List<State>();
+		protected List<State> m_accountStates = new List<State>();
+		protected List<ScopedStateRef> m_accounts = new List<ScopedStateRef>();
 		protected AABB m_worldBox;
 		protected double m_accumulate = 0;
 		protected List<Spacetime> m_spacetimes = new List<Spacetime>();
@@ -71,14 +72,15 @@ namespace Demos
 			{
 				var newAccount = m_spacetimes[ii].CreateState((st, stamp) => AccountFactory(st, stamp, ii));
 				m_namingSvc.RegisterObject(newAccount.StateId.ToString(), newAccount.GetType().ToString(), newAccount);
-				m_accounts.Add(newAccount);
+				m_accountStates.Add(newAccount);
+				m_accounts.Add(new ScopedStateRef(newAccount.StateId, newAccount.GetType().ToString()));
 			}
 
 			// deposit some initial money
 			using (new WithIn(m_spacetimes[0]))
 			{
 				foreach (var acc in m_accounts)
-					m_accountingInvoker.Deposit(GenRemoteRef(acc), 900.0f);
+					m_accountingInvoker.Deposit(acc, 900.0f);
 			}
 
 			// initial chronon
@@ -86,8 +88,6 @@ namespace Demos
 		}
 
 		protected abstract State AccountFactory(Spacetime st, IHTimestamp stamp, int index);
-
-		protected static RemoteStateRef GenRemoteRef(State state) { return new RemoteStateRef(state.StateId, state.GetType().ToString()); }
 
 		protected void SyncSpacetimes()
 		{

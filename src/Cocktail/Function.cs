@@ -27,20 +27,14 @@ namespace Cocktail
 			m_fn = (args) => methodInfo.Invoke(null, args);
 		}
 		
-		public void Exec(IEnumerable<StateParamInst> states, IEnumerable<object> constArgs)
+		public void Exec(IScope scope, IEnumerable<StateParamInst> states, IEnumerable<object> constArgs)
 		{
 			if (!Form.Check(states, constArgs))
 				throw new ApplicationException("The invocation doesn't match the form of the event declaration");
-			var argList = Form.GenArgList(states, constArgs).ToArray();
-			Exec(argList);
+			var argList = Form.GenArgList(scope, states, constArgs).ToArray();
+			m_fn(argList);
 			foreach (var stateInst in states)
 				stateInst.arg.Sync();
-		}
-
-		private void Exec(object[] argList)
-		{
-			// return value ignored for now
-			m_fn(argList);
 		}
 
 		//public static Function Make<P1>(Action<IEnumerable<StateParam>,P1> fn)
@@ -71,7 +65,7 @@ namespace Cocktail
             return "";
         }
 
-		public IEnumerable<object> GenArgList(IEnumerable<StateParamInst> states, IEnumerable<object> constArgs)
+		public IEnumerable<object> GenArgList(IScope scope, IEnumerable<StateParamInst> states, IEnumerable<object> constArgs)
 		{
 			IEnumerable<KeyValuePair<object,int>> stateArgs = states.Select<StateParamInst, StateParamInst>((spi) =>
 				{
@@ -80,7 +74,7 @@ namespace Cocktail
 						throw new ApplicationException(string.Format("can't find state param '{0}'", spi.name));
 					var newspi = new StateParamInst() { name = sp.name, type = sp.type, index = sp.index, arg = spi.arg };
 					return newspi;
-				}).Select(ConvertCocktailToCSharp);
+				}).Select((spi) => ConvertCocktailToCSharp(scope, spi));
 			bool bStateRemain, bConstRemain;
 			var stateEnumerator = stateArgs.GetEnumerator();
 			var constEnumerator = constArgs.GetEnumerator();
@@ -111,17 +105,17 @@ namespace Cocktail
 			while (bStateRemain || bConstRemain);
 		}
 
-		private static KeyValuePair<object, int> ConvertCocktailToCSharp(StateParamInst spi)
+		private static KeyValuePair<object, int> ConvertCocktailToCSharp(IScope scope, StateParamInst spi)
 		{
-			var stateType = spi.arg.GetType();
-			if (stateType.IsGenericType && stateType.GetGenericTypeDefinition() == typeof(LocalStateRef<>))
+			var stateRefType = spi.arg.GetType();
+			if (typeof(DirectStateRef).IsAssignableFrom(stateRefType))
 			{
-				var ret = stateType.InvokeMember("GetInterface", BindingFlags.InvokeMethod, null, spi.arg, new object[0]);
+				var ret = (spi.arg as DirectStateRef).GetObject();
 				return new KeyValuePair<object, int>(ret, spi.index);
 			}
-			else if (stateType == typeof(RemoteStateRef))
+			else if (stateRefType == typeof(ScopedStateRef))
 			{
-				var ret = (spi.arg as RemoteStateRef).GetObject();
+				var ret = (spi.arg as ScopedStateRef).GetObject(scope);
 				return new KeyValuePair<object, int>(ret, spi.index);
 			}
 

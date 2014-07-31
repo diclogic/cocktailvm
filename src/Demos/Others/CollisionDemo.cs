@@ -51,10 +51,10 @@ namespace Demos
         {
             if (m_elapsed > 2 && m_pushFlag)
             {
-                // (p).GodPush([1,1,0]);
-                m_pushFlag = false;
-                foreach (var p in m_particles)
-                    kernel.Callva("GodPush", null, InterpUtils.MakeArgList("body", new LocalStateRef<Particle>(p)), new Vector3(1.0f,1.0f,0).Random(m_rand));
+				//// (p).GodPush([1,1,0]);
+				//m_pushFlag = false;
+				//foreach (var p in m_particles)
+				//    kernel.Callva("GodPush", null, InterpUtils.MakeArgList("body", new LocalStateRef<Particle>(p)), new Vector3(1.0f,1.0f,0).Random(m_rand));
             }
 
             foreach (var p in m_particles)

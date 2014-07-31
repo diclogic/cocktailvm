@@ -4,6 +4,10 @@ using DOA;
 namespace Cocktail
 {
 
+	public interface IScope
+	{
+		object Dereference(TStateId sid);
+	}
 
 	public abstract class StateRef
 	{
@@ -28,26 +32,25 @@ namespace Cocktail
 		public virtual void SetField<T>(string name, T val) { throw new NotImplementedException(); }
 	}
 
-	public abstract class StateRefT<T>: StateRef
-		where T : class
+	public abstract class DirectStateRef : StateRef
 	{
-		protected StateRefT(TStateId stateId)
-			: base(stateId, typeof(T))
-		{
-		}
+		protected State m_impl;
 
-		//public virtual T GetInterface() { return null; }
-	}
-
-	public class LocalStateRef<T> : StateRefT<T>
-		where T : State
-	{
-		State m_impl;
-
-		public LocalStateRef(T impl)
-			:base(impl.StateId)
+		public DirectStateRef(State impl)
+			:base(impl.StateId, impl.GetType())
 		{
 			m_impl = impl;
+		}
+
+		public object GetObject() { return m_impl; }
+	}
+
+	public class _LocalStateRef<T> : DirectStateRef
+		where T : State
+	{
+		public _LocalStateRef(T impl)
+			:base(impl)
+		{
 		}
 
 		public T GetInterface()
@@ -68,16 +71,16 @@ namespace Cocktail
 		}
 	}
 
-	public class RemoteStateRef : StateRef
+	// DEPRECATED
+	public class _RemoteStateRef : StateRef
 	{
-		public RemoteStateRef(TStateId stateId, string refType)
+		public _RemoteStateRef(TStateId stateId, string refType)
 			: base(stateId, refType)
 		{
 		}
 
-		public object GetObject()
+		public object GetObject(Spacetime scope)
 		{
-			// FIXME: stateRef should only resolve to a local state (of a certain ST)
 			var state = NamingSvcClient.Instance.GetObject(StateId.ToString(), m_refType);
 			return state;
 		}
@@ -100,6 +103,21 @@ namespace Cocktail
 			var type = state.GetType();
 			type.GetField(name).SetValue(state, val);
 		}
+	}
+
+	public class ScopedStateRef : StateRef
+	{
+		public ScopedStateRef(TStateId stateId, string refType)
+			:base(stateId, refType)
+		{
+		}
+
+		public object GetObject(IScope scope)
+		{
+			return scope.Dereference(StateId);
+		}
+
+		public override void Sync() { }
 	}
 
 }

@@ -44,9 +44,9 @@ namespace Cocktail
 			return m_interpreter.IsDeclared(name);
 		}
 
-		public void Call(string eventName, IEnumerable<KeyValuePair<string, StateRef>> states, IEnumerable<object> constArgs)
+		public void Call(IScope scope, string eventName, IEnumerable<KeyValuePair<string, StateRef>> states, IEnumerable<object> constArgs)
 		{
-			m_interpreter.Call(eventName, states, constArgs);
+			m_interpreter.Call(scope, eventName, states, constArgs);
 		}
 
 		protected override StateSnapshot DoSnapshot(StateSnapshot initial)

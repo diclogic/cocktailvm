@@ -204,11 +204,11 @@ namespace Cocktail
 
 		}
 
-		public void Callva(string eventName, IEnumerable<KeyValuePair<string, StateRef>> states, params object[] constArgs)
+		public void Callva(IScope scope, string eventName, IEnumerable<KeyValuePair<string, StateRef>> states, params object[] constArgs)
 		{
-			Call(eventName, states, constArgs);
+			Call(scope, eventName, states, constArgs);
 		}
-		public void Call(string eventName, IEnumerable<KeyValuePair<string, StateRef>> states, IEnumerable<object> constArgs)
+		public void Call(IScope scope, string eventName, IEnumerable<KeyValuePair<string, StateRef>> states, IEnumerable<object> constArgs)
 		{
 			if (states.Any(kv => kv.Value == null))
 				throw new RuntimeException("state argument can't be null");
@@ -228,7 +228,7 @@ namespace Cocktail
 											, eventName
 											, MakeSignatureString(stateParams, constTypes) ));
 
-			func.Exec(GenStateParamInsts(states), constArgs);
+			func.Exec(scope, GenStateParamInsts(states), constArgs);
 		}
 
 

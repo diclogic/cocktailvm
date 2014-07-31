@@ -30,9 +30,7 @@ namespace Demos
 
 			using (new WithIn(m_spacetimes[0]))
 			{
-				m_accountingInvoker.Transfer( new LocalStateRef<Account>((Account)m_accounts[0])
-									, GenRemoteRef(m_accounts[1])
-									, (float)(m_rand.Next(100)-50));
+				m_accountingInvoker.Transfer(m_accounts[0], m_accounts[1], (float)(m_rand.Next(100) - 50));
 			}
 		}
 

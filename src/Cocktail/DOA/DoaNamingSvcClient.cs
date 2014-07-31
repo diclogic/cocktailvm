@@ -18,7 +18,7 @@ namespace DOA
 		protected struct Entry
 		{
 			public string type;
-			public State ptr;	// FIXME: fake impl
+			public State ptr;	// TODO: fake impl
 		}
 
 		public struct Location

@@ -107,7 +107,6 @@ namespace Cocktail
 		public IHEvent LatestEvent { get { return m_currentTime.Event; } }
 
 
-
         public Spacetime(IHTimestamp stamp, IHIdFactory idFactory)
 			:this(stamp, idFactory, Enumerable.Empty<State>())
         {
@@ -341,8 +340,7 @@ namespace Cocktail
 
 			evtFinal = evtFinal.Advance(ID);
 
-			// FIXME: the stateParams somehow won't be resolved to those states of the local ST
-			m_vm.Call(funcName, stateParams, constArgs.ToArray());
+			m_vm.Call(this.m_storageComponent, funcName, stateParams, constArgs.ToArray());
 
 			//----- make redo -------
 

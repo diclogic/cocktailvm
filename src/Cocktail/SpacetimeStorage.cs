@@ -15,7 +15,7 @@ namespace Cocktail
 		public IDictionary<TStateId,State> LocalStates;
 	}
 
-	public class SpacetimeStorage
+	public class SpacetimeStorage : IScope
 	{
 		private Dictionary<TStateId, State> m_nativeStates;
 		private Dictionary<TStateId, State> m_allStates;
@@ -118,5 +118,14 @@ namespace Cocktail
 
 			m_externalSTs.Remove(spacetimeId);
 		}
+
+		#region IScope Members
+
+		public object Dereference(TStateId sid)
+		{
+			return m_allStates[sid];
+		}
+
+		#endregion
 	}
 }

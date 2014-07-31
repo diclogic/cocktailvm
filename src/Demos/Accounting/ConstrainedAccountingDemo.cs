@@ -65,19 +65,19 @@ namespace Demos
 		{
 			Log.Info("DEMO", "collision step 1");
 			using (new WithIn(m_spacetimes[0]))
-				m_accountingInvoker.Withdraw(new LocalStateRef<MonitoredAccount>((MonitoredAccount)m_accounts[0]), 5.0f);
+				m_accountingInvoker.Withdraw(m_accounts[0], 5.0f);
 
 			Log.Info("DEMO", "collision step 2");
 			using (new WithIn(m_spacetimes[1]))
-				m_accountingInvoker.Transfer(GenRemoteRef(m_accounts[0]), GenRemoteRef(m_accounts[1]), 7.0f);
+				m_accountingInvoker.Transfer(m_accounts[0], m_accounts[1], 7.0f);
 
 			SyncSpacetimes();
 		}
 
 		public override IPresent GetPresent()
 		{
-			return new Present(m_accounts.Select(acc => ((MonitoredAccount)acc).Snapshot()).ToArray()
-				, m_worldBox);
+			var statesnapshots = m_accounts.Select(sid => m_spacetimes.First(st => st.ID == m_namingSvc.GetObjectSpaceTimeID(sid.StateId.ToString())).ExportStateSnapshot(sid.StateId)).ToArray();
+			return new Present(statesnapshots, m_worldBox);
 		}
 	}
 }
