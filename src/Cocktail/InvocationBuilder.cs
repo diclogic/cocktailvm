@@ -207,7 +207,9 @@ namespace Cocktail
 			var daType = typeof(DebuggableAttribute);
 			var daCtor = daType.GetConstructor(new Type[] { typeof(DebuggableAttribute.DebuggingModes) });
 			var daBuilder = new CustomAttributeBuilder(daCtor, new object[] { 
+#if DEBUG
 				DebuggableAttribute.DebuggingModes.DisableOptimizations | 
+#endif
 				DebuggableAttribute.DebuggingModes.Default });
 
 			assembly.SetCustomAttribute(daBuilder);

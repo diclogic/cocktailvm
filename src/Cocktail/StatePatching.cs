@@ -284,7 +284,7 @@ namespace Cocktail
 
 			var flag = overridingFlag.HasValue ? overridingFlag.Value : newState.FindPatchMethod();
 
-			// TODO: since every patch can potentially create the new state, we should do it smartly (registered type or self-descriptive dynamic type)
+			// TODO: since now every patch can potentially create the new state, we should do it smartly (registered type or self-descriptive dynamic type)
 			//// Every commutative delta has the potential to create a new object, so we need the type
 			//if (0 != (flag & (PatchFlag.CreateBit | PatchFlag.CommutativeBit)))
 			//{
