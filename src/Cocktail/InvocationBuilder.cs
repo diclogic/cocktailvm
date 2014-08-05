@@ -1,9 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Diagnostics.SymbolStore;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
-using System.Text;
 
 namespace Cocktail
 {
@@ -31,6 +32,7 @@ namespace Cocktail
 
 			// module creation
 			var module = GenerateModule("CocktailInvoker_"+interf.Name);
+			var source = module.DefineDocument(new StackFrame(true).GetFileName(), Guid.Empty, Guid.Empty, Guid.Empty);
 
 			// type definition
 			TypeBuilder typeBuilder;
@@ -52,7 +54,7 @@ namespace Cocktail
 			// methods
 			foreach (var ifMethod in interf.GetMethods())
 			{
-				GenerateMethod(typeBuilder, ifMethod);
+				GenerateMethod(typeBuilder, ifMethod, source);
 			}
 
 			return typeBuilder.CreateType();
@@ -67,7 +69,7 @@ namespace Cocktail
 		///         .Execute("Deposit", Utils.MakeArgList("account", account), amount);
 		/// }
 		/// </summary>
-		private static void GenerateMethod(TypeBuilder typeBuilder, MethodInfo ifMethod)
+		private static void GenerateMethod(TypeBuilder typeBuilder, MethodInfo ifMethod, ISymbolDocumentWriter source)
 		{
 			var ifMethodParams = ifMethod.GetParameters();
 
@@ -84,13 +86,19 @@ namespace Cocktail
 			// local variables
 			var localVarargs = il.DeclareLocal(typeof(object[]));	// varargs
 			var localStateArgs = il.DeclareLocal(stateArgPairsType);
+			localStateArgs.SetLocalSymInfo("stateArgs");
+			var localST = il.DeclareLocal(typeof(Spacetime));
 
-			//static Utils.MakeArgList()
+			// exceptions
+			var runtimeExcType = typeof(Cocktail.RuntimeException);
+
+			//static Utils.MakeArgList(...)
 			{
 				var stateParams = ifMethodParams.Where(x => x.ParameterType == typeof(StateRef));
 				if (stateParams.FirstOrDefault() == null)
 					throw new JITCompileException(string.Format("Each method must have at least one state. Method name:", ifMethod.Name));
 
+				MarkTraceablePoint(il, source, new StackFrame(true));
 				CreateArray(il, localVarargs, stateParams.Count() * 2);	//< 2 elements per arg
 
 				int idx = 0;
@@ -109,11 +117,25 @@ namespace Cocktail
 			}
 
 			// var ST = WithIn.GetWithin();
+			// if (ST==null) throw RuntimeExc...
 			// ST.Execute("Deposit", ..., params object[] args)
 			{
-				var methodGetWthin = typeof(WithIn).GetMethod("GetWithin", new Type[] { });
-				il.EmitCall(OpCodes.Call, methodGetWthin, null);
+				var lableOK = il.DefineLabel();
 
+				var methodGetWthin = typeof(WithIn).GetMethod("GetWithin", new Type[] { });
+				MarkTraceablePoint(il, source, new StackFrame(true));
+				il.EmitCall(OpCodes.Call, methodGetWthin, null);
+				il.Emit(OpCodes.Stloc, localST);
+
+				il.Emit(OpCodes.Ldloc, localST);
+				il.Emit(OpCodes.Brtrue_S, lableOK);
+
+				MarkTraceablePoint(il, source, new StackFrame(true));
+				ThrowRuntimeException(il, @"No Spacetime scope detected, please wrap your call with using(new WithIn(ST)){...}");
+
+				MarkTraceablePoint(il, source, new StackFrame(true));
+				il.MarkLabel(lableOK);
+				il.Emit(OpCodes.Ldloc, localST);
 				il.Emit(OpCodes.Ldstr, ifMethod.Name);
 				il.Emit(OpCodes.Ldloc, localStateArgs);
 
@@ -142,6 +164,26 @@ namespace Cocktail
 			il.Emit(OpCodes.Ret);
 		}
 
+		private static void MarkTraceablePoint(ILGenerator il, ISymbolDocumentWriter source, StackFrame frame)
+		{
+			var ln = frame.GetFileLineNumber();
+			il.MarkSequencePoint(source, ln, 1, ln, 100);
+		}
+
+		private static void ThrowRuntimeException(ILGenerator il, string msg)
+		{
+			ThrowRuntimeException(il, typeof(RuntimeException), msg);
+		}
+
+		private static void ThrowRuntimeException(ILGenerator il, Type excType, string msg)
+		{
+			Debug.Assert(typeof(RuntimeException).IsAssignableFrom(excType));
+			var ctor = excType.GetConstructor(new[] { typeof(string) });
+			il.Emit(OpCodes.Ldstr, msg);
+			il.Emit(OpCodes.Newobj, ctor);
+			il.Emit(OpCodes.Throw);
+		}
+
 		private static void CreateArray(ILGenerator il, LocalBuilder arr, int size)
 		{
 			il.Emit(OpCodes.Ldc_I4, size);
@@ -161,6 +203,14 @@ namespace Cocktail
 		{
 			var assemblyName = new AssemblyName(moduleName);
 			var assembly = AppDomain.CurrentDomain.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.Run);
+
+			var daType = typeof(DebuggableAttribute);
+			var daCtor = daType.GetConstructor(new Type[] { typeof(DebuggableAttribute.DebuggingModes) });
+			var daBuilder = new CustomAttributeBuilder(daCtor, new object[] { 
+				DebuggableAttribute.DebuggingModes.DisableOptimizations | 
+				DebuggableAttribute.DebuggingModes.Default });
+
+			assembly.SetCustomAttribute(daBuilder);
 			return assembly.DefineDynamicModule(moduleName, true);
 		}
 	}

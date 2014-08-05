@@ -303,6 +303,9 @@ namespace Cocktail
 
 		public bool Execute(string funcName, IEnumerable<KeyValuePair<string, StateRef>> stateParams, params object[] constArgs)
 		{
+			if (this == null)
+				throw new RuntimeException("Can't find SpaceTime to execute in. Did you forgot use `WithIn` syntax");
+
 			lock (m_executionLock)
 			{
 				return ExecuteArgs(funcName, stateParams, constArgs);
@@ -340,7 +343,7 @@ namespace Cocktail
 
 			evtFinal = evtFinal.Advance(ID);
 
-			m_vm.Call(this.m_storageComponent, funcName, stateParams, constArgs.ToArray());
+			m_vm.Call(m_storageComponent, funcName, stateParams, constArgs.ToArray());
 
 			//----- make redo -------
 

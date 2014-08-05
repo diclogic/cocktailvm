@@ -20,7 +20,8 @@ namespace Demos
 			m_vmST.VMBind(typeof(IAccounting), typeof(ConstrainedAccounting));
 			base.Init(worldBox);
 
-			RegisterAction(2, "collision");
+			RegisterAction(2, "transfer");
+			RegisterAction(3, "collision");
 		}
 
 		public override void Update(IRenderer renderer, double dt, IEnumerable<string> controlCmds)
@@ -32,6 +33,9 @@ namespace Demos
 					continue;
 				switch (args[0])
 				{
+					case "transfer":
+						MakeNormalTransfer();
+						break;
 					case "collision":
 						MakeCollision();
 						break;
@@ -56,9 +60,16 @@ namespace Demos
 			}
 		}
 
-		override protected State AccountFactory(Spacetime st, IHTimestamp stamp, int index)
+		protected override State AccountFactory(Spacetime st, IHTimestamp stamp, int index)
 		{
 			return new MonitoredAccount(TStateId.DebugCreate(111ul * ((ulong)index + 1)), stamp);
+		}
+
+		private void MakeNormalTransfer()
+		{
+			Log.Info("DEMO", "normal transfer");
+			//using(new WithIn(m_spacetimes[0]))
+				m_accountingInvoker.Transfer(m_accounts[0], m_accounts[1], (float)(m_rand.Next(100) - 50));
 		}
 
 		private void MakeCollision()
@@ -70,13 +81,13 @@ namespace Demos
 			Log.Info("DEMO", "collision step 2");
 			using (new WithIn(m_spacetimes[1]))
 				m_accountingInvoker.Transfer(m_accounts[0], m_accounts[1], 7.0f);
-
-			SyncSpacetimes();
 		}
 
 		public override IPresent GetPresent()
 		{
-			var statesnapshots = m_accounts.Select(sid => m_spacetimes.First(st => st.ID == m_namingSvc.GetObjectSpaceTimeID(sid.StateId.ToString())).ExportStateSnapshot(sid.StateId)).ToArray();
+			var statesnapshots = m_accounts.Select(sid => m_spacetimes.First(st =>
+				st.ID == m_namingSvc.GetObjectSpaceTimeID(sid.StateId.ToString())
+				).ExportStateSnapshot(sid.StateId)).ToArray();
 			return new Present(statesnapshots, m_worldBox);
 		}
 	}
