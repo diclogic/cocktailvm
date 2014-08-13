@@ -6,7 +6,7 @@ using System.Reflection;
 using System.Text;
 
 
-namespace Cocktail
+namespace Cocktail.Interp
 {
 
     internal struct SubscriptionSignature : IComparable<SubscriptionSignature>
@@ -44,7 +44,7 @@ namespace Cocktail
 		//public TimeStamp timestamp;
 	}
 
-	public static class InterpUtils
+	public static class Utils
 	{
 		public static IEnumerable<KeyValuePair<string, StateRef>> MakeArgList(params object[] args)
 		{
@@ -60,78 +60,7 @@ namespace Cocktail
 		}
 	}
 
-    //public class EventProcessor
-    //{
-    //    Dictionary<SubscriptionSignature, Function> m_subscriptions = new Dictionary<SubscriptionSignature, Function>();
-    //    List<EventInstance> m_pendingEvents = new List<EventInstance>();
-    //    Interpreter m_kernel;
 
-    //    EventProcessor(Interpreter kernel)
-    //    {
-    //        m_kernel = kernel;
-    //    }
-
-    //    public void Happen(string eventName, IEnumerable<KeyValuePair<string, State>> states, params object[] constArgs)
-    //    {
-    //        m_pendingEvents.Add(new EventInstance() { Name = eventName, States = states, ConstArgs = constArgs });
-    //    }
-
-    //    public void DoAwareOf(string eventName, FunctionForm newForm, Delegate responser, State[] states)
-    //    {
-    //        FunctionForm form;
-    //        if (!m_kernel.TryGetValue(eventName, out form))
-    //        {
-    //            Declare(eventName, newForm);
-    //            form = newForm;
-    //        }
-    //        else
-    //        {
-    //            if (!form.Check(newForm))
-    //                throw new ApplicationException("Trying to listen to a event which don't have the same form");
-    //        }
-
-    //        var key = SubscriptionSignature.Generate(states, eventName);
-    //        m_subscriptions.Add(key, new Function(form, responser));
-    //    }
-
-    //    public void AwareOf(string eventName, MethodInfo methodInfo, Delegate responser, params State[] states)
-    //    {
-    //        DoAwareOf(eventName, FunctionForm.From(methodInfo), responser, states);
-    //    }
-
-    //    //public void AwareOf(string eventName, Action<IEnumerable<StateParamInst>> responser, params State[] states)
-    //    //{
-    //    //    DoAwareOf(eventName, FunctionForm.From(responser.Method), responser, states);
-    //    //}
-    //    //public void AwareOf<P1>(string eventName, Action<IEnumerable<StateParamInst>, P1> responser, params State[] states)
-    //    //{
-    //    //    DoAwareOf(eventName, FunctionForm.From(responser.Method), responser, states);
-    //    //}
-    //    //public void AwareOf<P1, P2>(string eventName, Action<IEnumerable<StateParamInst>, P1, P2> responser, params State[] states)
-    //    //{
-    //    //    DoAwareOf(eventName, FunctionForm.From(responser.Method), responser, states);
-    //    //}
-    //    //public void AwareOf<P1, P2, P3>(string eventName, Action<IEnumerable<StateParamInst>, P1, P2, P3> responser, params State[] states)
-    //    //{
-    //    //    DoAwareOf(eventName, FunctionForm.From(responser.Method), responser, states);
-    //    //}
-
-    //}
-
-    public class CompileTimeException : ApplicationException
-    {
-        public CompileTimeException(string reason) : base(reason) { }
-    }
-
-	public class JITCompileException : ApplicationException
-	{
-		public JITCompileException(string reason) : base(reason) { }
-	}
-
-	public class RuntimeException : ApplicationException
-	{
-        public RuntimeException(string reason) : base(reason) { }
-	}
 
 
     /// <summary>

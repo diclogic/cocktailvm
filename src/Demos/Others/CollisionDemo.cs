@@ -9,6 +9,7 @@ using OpenTK.Graphics.OpenGL;
 using MathLib;
 using System.Reflection;
 using Cocktail;
+using Cocktail.Interp;
 using Demos.States;
 using Skeleton;
 

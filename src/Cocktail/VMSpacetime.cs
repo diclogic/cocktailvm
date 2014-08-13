@@ -5,6 +5,7 @@ using System.Text;
 using System.IO;
 using Cocktail.HTS;
 using System.Reflection;
+using Cocktail.Interp;
 
 
 namespace Cocktail
@@ -67,7 +68,7 @@ namespace Cocktail
 		public void VMExecuteArgs(string funcName, IEnumerable<object> constArgs)
 		{
 			ExecuteArgs(funcName
-				, InterpUtils.MakeArgList("VM", new _LocalStateRef<VMState>(m_vm))
+				, Utils.MakeArgList("VM", new _LocalStateRef<VMState>(m_vm))
 				, constArgs);
 		}
 	}

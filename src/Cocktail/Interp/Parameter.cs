@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace Cocktail
+namespace Cocktail.Interp
 {
 	public class StateParam : IEquatable<StateParam>
 	{

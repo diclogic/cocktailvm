@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.IO;
 using Cocktail.HTS;
+using Cocktail.Interp;
 using System.Reflection;
 
 namespace Cocktail

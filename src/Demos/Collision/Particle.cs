@@ -4,6 +4,7 @@ using Cocktail;
 using Common;
 using Cocktail.HTS;
 using OpenTK;
+using Cocktail.Interp;
 
 namespace Demos.States
 {

@@ -40,12 +40,13 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="BaseExceptions.cs" />
     <Compile Include="DOA\DoaNamingSvcClient.cs" />
     <Compile Include="DOA\SyncManager.cs" />
-    <Compile Include="Function.cs" />
-    <Compile Include="Interpretor.cs" />
+    <Compile Include="Interp\Function.cs" />
+    <Compile Include="Interp\Interpretor.cs" />
     <Compile Include="InvocationBuilder.cs" />
-    <Compile Include="Parameter.cs" />
+    <Compile Include="Interp\Parameter.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SpaceTime.cs" />
     <Compile Include="SpacetimeStorage.cs" />
@@ -74,9 +75,7 @@
       <Name>MathLib</Name>
     </ProjectReference>
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="VM\" />
-  </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
