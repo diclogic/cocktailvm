@@ -14,6 +14,7 @@ namespace Demos
 	public class ConstrainedAccountingDemo : BaseAccountingDemo
 	{
 		Random m_rand = new Random();
+		int m_nPresenting = 0;
 
 		public override void Init(AABB worldBox)
 		{
@@ -22,6 +23,7 @@ namespace Demos
 
 			RegisterAction(2, "transfer");
 			RegisterAction(3, "collision");
+			RegisterAction(4, "nextpresent");
 		}
 
 		public override void Update(IRenderer renderer, double dt, IEnumerable<string> controlCmds)
@@ -38,6 +40,9 @@ namespace Demos
 						break;
 					case "collision":
 						MakeCollision();
+						break;
+					case "nextpresent":
+						m_nPresenting = (m_nPresenting + 1) % 2;
 						break;
 				}
 			}
@@ -85,9 +90,8 @@ namespace Demos
 
 		public override IPresent GetPresent()
 		{
-			var statesnapshots = m_accounts.Select(sid => m_spacetimes.First(st =>
-				st.ID == m_namingSvc.GetObjectSpaceTimeID(sid.StateId.ToString())
-				).ExportStateSnapshot(sid.StateId)).ToArray();
+			int idx = m_nPresenting;
+			var statesnapshots = m_accounts.Select(sref => m_spacetimes[idx].ExportStateSnapshot(sref.StateId)).ToArray();
 			return new Present(statesnapshots, m_worldBox);
 		}
 	}

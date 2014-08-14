@@ -34,6 +34,7 @@ namespace Launcher
 			this.glControl1 = new OpenTK.GLControl();
 			this.button2 = new System.Windows.Forms.Button();
 			this.button3 = new System.Windows.Forms.Button();
+			this.button4 = new System.Windows.Forms.Button();
 			this.SuspendLayout();
 			// 
 			// button1
@@ -72,16 +73,26 @@ namespace Launcher
 			this.button3.Text = "button3";
 			this.button3.UseVisualStyleBackColor = true;
 			// 
-			// Form1
+			// button4
+			// 
+			this.button4.Location = new System.Drawing.Point(258, 400);
+			this.button4.Name = "button4";
+			this.button4.Size = new System.Drawing.Size(79, 22);
+			this.button4.TabIndex = 4;
+			this.button4.Text = "button4";
+			this.button4.UseVisualStyleBackColor = true;
+			// 
+			// LauncherWindow
 			// 
 			this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
 			this.ClientSize = new System.Drawing.Size(526, 433);
+			this.Controls.Add(this.button4);
 			this.Controls.Add(this.button3);
 			this.Controls.Add(this.button2);
 			this.Controls.Add(this.glControl1);
 			this.Controls.Add(this.button1);
-			this.Name = "Form1";
+			this.Name = "LauncherWindow";
 			this.Text = "Form1";
 			this.ResumeLayout(false);
 
@@ -93,6 +104,7 @@ namespace Launcher
         private OpenTK.GLControl glControl1;
 		private System.Windows.Forms.Button button2;
 		private System.Windows.Forms.Button button3;
+		private System.Windows.Forms.Button button4;
     }
 }
 
