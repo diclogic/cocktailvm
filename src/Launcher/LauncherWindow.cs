@@ -16,10 +16,13 @@ namespace Launcher
 {
 
 
-    public partial class LauncherWindow : Form
+    public partial class LauncherWindow : Form, IControlPanel
     {
+		Dictionary<Button, int> m_buttons = new Dictionary<Button, int>();
 
-        internal LauncherWindow(IActionListener actionListener)
+		public event ActionTriggeredDeleg ActionTriggered;
+
+        internal LauncherWindow()
 		{
 			InitializeComponent();
 
@@ -29,21 +32,39 @@ namespace Launcher
 
 			this.glControl1.Paint += new System.Windows.Forms.PaintEventHandler(this.glControl1_Paint);
 			this.glControl1.Load += new System.EventHandler(this.glControl1_Load);
-			this.button1.Click += (sender,_) => OnButtonClick((Button)sender, actionListener);
-			this.button2.Click += (sender,_) => OnButtonClick((Button)sender, actionListener);
-			this.button3.Click += (sender,_) => OnButtonClick((Button)sender, actionListener);
+
+			for (int ii = 0; ii < Controls.Count; ++ii)
+			{
+				if (Controls[ii] is Button)
+					m_buttons.Add(Controls[ii] as Button, 0);
+			}
+
+			var btCtls = m_buttons.Keys.ToArray();
+
+			foreach (var b in btCtls)
+			{
+				var match = Regex.Match(b.Name, "button([0-9]+)");
+				if (match.Groups.Count != 2)
+					return;
+
+				var buttonNumber = int.Parse(match.Groups[1].Captures[0].Value);
+				m_buttons[b] = buttonNumber;
+
+				b.Click += (sender,_) => OnButtonClick((Button)sender);
+			}
 		}
 
 		public GLControl GetGLWindow() { return this.glControl1; }
 
-		void OnButtonClick(Button sender, IActionListener listener)
+		public void SetButtonText(int idx, string text)
 		{
-			var match = Regex.Match(((Button)sender).Name, "button([0-9])");
-			if (match.Groups.Count != 2)
-				return;
+			m_buttons.First(kv => kv.Value == idx).Key.Text = text;
+		}
 
-			var buttonNumber = int.Parse(match.Groups[1].Captures[0].Value);
-			listener.OnAction(buttonNumber);
+		void OnButtonClick(Button sender)
+		{
+			if (ActionTriggered != null)
+				ActionTriggered(m_buttons[sender]);
 		}
 
         private void glControl1_Load(object sender, EventArgs e)
@@ -56,7 +77,7 @@ namespace Launcher
             Thread.Sleep(1);
         }
 
-    }
+	}
 
 
 }

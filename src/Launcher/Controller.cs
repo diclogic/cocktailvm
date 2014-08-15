@@ -7,28 +7,35 @@ using System.Windows.Forms;
 
 namespace Launcher
 {
-	internal interface IActionListener
+
+	public delegate void ActionTriggeredDeleg(int idx);
+
+	public interface IControlPanel
 	{
-		void OnAction(int idx);
+		void SetButtonText(int idx, string text);
+		event ActionTriggeredDeleg ActionTriggered;
 	}
 
-	internal class Controller : IActionListener
+	internal class Controller
 	{
         IModel m_model;
         IRenderer m_renderer;
 		Dictionary<int, string> m_actions = new Dictionary<int, string>();
+		IControlPanel m_panel;
 
 		public IModel Model { get { return m_model; } }
 		public IRenderer Renderer { get { return m_renderer; } }
 
-		public void Initialize(IRenderer renderer, IModel model, Form mainWindow, UserControl viewportWindow)
+		public void Initialize(IRenderer renderer, IModel model, IControlPanel panel, Form mainWindow, UserControl viewportWindow)
 		{
 			m_renderer = renderer;
 			m_model = model;
+			m_panel = panel;
 
 			m_model.ActionMapAssigned += OnModelActionMapAssigned;
-
             m_renderer.Model = m_model;
+
+			m_panel.ActionTriggered += OnAction;
 
 			mainWindow.Move += (_,__) =>
 				m_model.Input(string.Format("move {0} {1} {2} {3}", mainWindow.Left, mainWindow.Top
@@ -51,7 +58,10 @@ namespace Launcher
 		{
 			m_actions = new Dictionary<int, string>();
 			foreach (var kv in mapping)
+			{
 				m_actions[kv.Key] = kv.Value;
+				m_panel.SetButtonText(kv.Key, kv.Value);
+			}
 		}
 
 		public void OnAction(int idx)

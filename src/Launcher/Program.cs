@@ -24,15 +24,16 @@ namespace Launcher
             Application.SetCompatibleTextRenderingDefault(false);
 			try
 			{
-				var controller = new Controller();
-				var mainWindow = new LauncherWindow(controller);
+				var mainWindow = new LauncherWindow();
 				var glWindow = mainWindow.GetGLWindow();
 				var args = Environment.GetCommandLineArgs();
 
 				var loader = new ModelLoader();
 				var model = loader.LoadModel(args.ElementAtOrDefault(1));
 				var renderer = new Renderer(glWindow);
-				controller.Initialize(renderer, model, mainWindow, glWindow);
+
+				var controller = new Controller();
+				controller.Initialize(renderer, model, mainWindow, mainWindow, glWindow);
 
 				Application.Run(mainWindow);
 			}
