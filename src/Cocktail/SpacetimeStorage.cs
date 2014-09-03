@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Cocktail.HTS;
+using Core.Aux.System;
 
 namespace Cocktail
 {
@@ -18,13 +19,13 @@ namespace Cocktail
 	public class SpacetimeStorage : IScope
 	{
 		private Dictionary<TStateId, State> m_nativeStates;
-		private Dictionary<TStateId, State> m_allStates;
+		private Dictionary<TStateId, State> m_stateCache;
 		// we use cached state to "pro-act" on an event involves external states optimistically, and let the external ST denies it.
 		private Dictionary<IHId, ExternalSTEntry> m_externalSTs = new Dictionary<IHId, ExternalSTEntry>();
 
 		public SpacetimeStorage(IEnumerable<State> initialStates, IEnumerable<ExternalSTEntry> initialExternalSTs)
 		{
-			m_allStates = initialStates.ToDictionary((s) => s.StateId);
+			m_stateCache = initialStates.ToDictionary((s) => s.StateId);
 			m_nativeStates = initialStates.ToDictionary((s) => s.StateId);
 
 			foreach (var st in initialExternalSTs)
@@ -34,7 +35,7 @@ namespace Cocktail
 		internal void AddNativeState(State newState)
 		{
 			m_nativeStates.Add(newState.StateId, newState);
-			m_allStates[newState.StateId] = newState;
+			m_stateCache[newState.StateId] = newState;
 		}
 
 		//internal void AddState(State newState)
@@ -44,7 +45,7 @@ namespace Cocktail
 
 		internal IEnumerable<State> GetAllStates()
 		{
-			return m_allStates.Values;
+			return m_stateCache.Values;
 		}
 
 		internal IEnumerable<State> GetNativeStates()
@@ -54,7 +55,7 @@ namespace Cocktail
 
 		internal IEnumerable<State> GetAllStates(IEnumerable<TStateId> ids)
 		{
-			return m_allStates.Where(kv => ids.Contains(kv.Key)).Select(kv => kv.Value);
+			return m_stateCache.Where(kv => ids.Contains(kv.Key)).Select(kv => kv.Value);
 		}
 
 		internal bool HasState(TStateId id)
@@ -65,7 +66,7 @@ namespace Cocktail
 		internal State GetState(TStateId id)
 		{
 			State retval;
-			if (!m_allStates.TryGetValue(id, out retval))
+			if (!m_stateCache.TryGetValue(id, out retval))
 				return null;
 			return retval;
 		}
@@ -79,7 +80,7 @@ namespace Cocktail
 			if (retval == null)
 				throw new ArgumentException("The provided constructor doesn't always provide a State object");
 
-			m_allStates.Add(retval.StateId, retval);
+			m_stateCache.Add(retval.StateId, retval);
 			return retval;
 		}
 
@@ -104,7 +105,11 @@ namespace Cocktail
 			m_externalSTs[entry.SpacetimeId] = entry;
 
 			foreach (var s in entry.LocalStates)
-				m_allStates[s.Key] = s.Value;
+			{
+				if (m_stateCache.ContainsKey(s.Key))
+					Log.Warning("Relpacing cached state `{0}`", s.Key);
+				m_stateCache[s.Key] = s.Value;
+			}
 		}
 
 		void RemoveSpacetime(IHId spacetimeId)
@@ -114,7 +119,8 @@ namespace Cocktail
 				return;
 
 			foreach (var sid in entry.LocalStates.Keys)
-				m_allStates.Remove(sid);
+				if (!m_nativeStates.ContainsKey(sid))
+					m_stateCache.Remove(sid);
 
 			m_externalSTs.Remove(spacetimeId);
 		}
@@ -123,7 +129,7 @@ namespace Cocktail
 
 		public object Dereference(TStateId sid)
 		{
-			return m_allStates[sid];
+			return m_stateCache[sid];
 		}
 
 		#endregion
