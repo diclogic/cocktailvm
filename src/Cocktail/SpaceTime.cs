@@ -91,6 +91,8 @@ namespace Cocktail
 			}
 		}
 
+		private static IStdLib m_stdlib = InvocationBuilder.Build<IStdLib>("Cocktail");
+
 		// ========== components ===============
 		protected SpacetimeStorage m_storageComponent;
 
@@ -105,6 +107,7 @@ namespace Cocktail
 
 		public IHId ID { get { return m_currentTime.ID; } }
 		public IHEvent LatestEvent { get { return m_currentTime.Event; } }
+		public TStateId StorageSID { get { return m_storageComponent.StateId; } }
 
 
         public Spacetime(IHTimestamp stamp, IHIdFactory idFactory)
@@ -128,14 +131,14 @@ namespace Cocktail
 			m_idFactory = idFactory;
 			m_vm = new VMState(stamp);
 
-			// every ST must have the minimal VM since the very beginning, VM's life time has no beginning nor an end
+			// every ST must have the minimal VM since the very beginning, VM's life time has no beginning nor end
 			ExternalSTEntry vmST;
 			vmST.IsListeningTo = true;
 			vmST.SpacetimeId = m_vm.SpacetimeID;
 			vmST.LatestUpateTime = HTSFactory.CreateZeroEvent();
 			vmST.LocalStates = Enumerable.Repeat<State>(m_vm, 1).ToDictionary(s => s.StateId);
 
-			m_storageComponent = new SpacetimeStorage(initialStates, Enumerable.Repeat(vmST, 1));
+			m_storageComponent = new SpacetimeStorage(stamp, initialStates, Enumerable.Repeat(vmST, 1));
 		}
 
 		public State CreateState(Func<Spacetime, IHTimestamp, State> constructor)
@@ -670,5 +673,25 @@ namespace Cocktail
 
 			CommitChronon(evtOri, evtFinal, Enumerable.Empty<State>(), localRedo);
 		}
+
+		#region Migration
+		public void Immigrate(TStateId immigrantId, IHId departuringST)
+		{
+			if (!m_storageComponent.HasState(immigrantId))
+				throw new RuntimeException("Failed to immigrate `{0}` to `{1}`: not in board yet", immigrantId, departuringST);
+
+			var sidOrNot = PseudoSyncMgr.Instance.GetSpacetimeStorageSID(departuringST);
+			if (!sidOrNot.HasValue)
+				throw new ApplicationException(string.Format("Unable to find storage for ST `{0}`", departuringST));
+
+			TStateId storageSID = sidOrNot.Value;
+			using (new WithIn(this))
+			{
+				m_stdlib.Migrate(new _LocalStateRef<SpacetimeStorage>(m_storageComponent)
+					, new ScopedStateRef(storageSID, typeof(SpacetimeStorage).ToString())
+					, immigrantId);
+			}
+		}
+		#endregion
 	}
 }

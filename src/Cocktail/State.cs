@@ -60,6 +60,11 @@ namespace Cocktail
 		{
 			return m_val.ToString();
 		}
+
+		public ulong ToUlong()
+		{
+			return m_val;
+		}
 	}
 
 	public abstract class State //: ICloneable
@@ -211,6 +216,11 @@ namespace Cocktail
 		{
 			LatestUpdate = evtFinal;
 			Rev += 1;
+		}
+
+		internal void OnMigratingTo(IHId stid)
+		{
+			SpacetimeID = stid;
 		}
 	}
 }

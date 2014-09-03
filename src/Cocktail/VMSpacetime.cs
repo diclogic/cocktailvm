@@ -10,7 +10,9 @@ using Cocktail.Interp;
 
 namespace Cocktail
 {
-
+	/// <summary>
+	/// The Spacetime that the VM lives in
+	/// </summary>
 	public class VMSpacetime : Spacetime
 	{
 		public readonly TStateId VMStateId;
@@ -57,19 +59,9 @@ namespace Cocktail
 
 		public void VMDefine(string funcName, MethodInfo method)
 		{
-			VMExecute("Cocktail.DeclareAndLink", funcName, method);
-		}
-
-		public void VMExecute(string funcName, params object[] constArgs)
-		{
-			VMExecuteArgs(funcName, constArgs);
-		}
-
-		public void VMExecuteArgs(string funcName, IEnumerable<object> constArgs)
-		{
-			ExecuteArgs(funcName
+			ExecuteArgs("Cocktail.DeclareAndLink"
 				, Utils.MakeArgList("VM", new _LocalStateRef<VMState>(m_vm))
-				, constArgs);
+				, new object[] { funcName, method });
 		}
 	}
 }

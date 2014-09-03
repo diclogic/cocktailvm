@@ -58,6 +58,7 @@
     <Compile Include="HTS\IEvent.cs" />
     <Compile Include="HTS\IIdentity.cs" />
     <Compile Include="HTS\ITimestamp.cs" />
+    <Compile Include="stdlib\StdLib.cs" />
     <Compile Include="VMSpacetime.cs" />
     <Compile Include="VMState.cs" />
     <Compile Include="WithIn.cs" />

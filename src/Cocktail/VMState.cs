@@ -22,7 +22,7 @@ namespace Cocktail
 			public string MethodName;
 		}
 
-		private Interpreter m_interpreter;
+		private LangVM m_interpreter;
 
 		[StateField(PatchKind = FieldPatchCompatibility.CommutativeDelta)]
 		private Dictionary<string, FunctionMetadata> m_functionMetadatas = new Dictionary<string, FunctionMetadata>();
@@ -30,9 +30,11 @@ namespace Cocktail
 		public VMState( IHTimestamp stamp)
 			: base(new TStateId(19830602), stamp.ID, stamp.Event, StatePatchMethod.Customized)
 		{
-			m_interpreter = new Interpreter();	//< we don't really need one interpreter per VMstate
+			m_interpreter = new LangVM();	//< we don't really need one interpreter per VMstate
 												//< interpreter instances can be shared by copy-on-write
-			m_interpreter.DeclareAndLink("Cocktail.DeclareAndLink", typeof(Interpreter).GetMethod("DeclareAndLink_cocktail"));
+			m_interpreter.DeclareAndLink("Cocktail.DeclareAndLink", typeof(LangVM).GetMethod("DeclareAndLink_cocktail"));
+
+			LoadStdLib();
 		}
 
 		public void DeclareAndLink(string name, MethodInfo methodInfo)
@@ -123,6 +125,17 @@ namespace Cocktail
 			{
 				var methodInfo = Type.GetType(entry.HostClass).GetMethod(entry.MethodName);
 				m_interpreter.DeclareAndLink(entry.Name, methodInfo);
+			}
+		}
+
+		private void LoadStdLib()
+		{
+			foreach (var m in typeof(StdLib).GetMethods())
+			{
+				if (!m.IsStatic || !m.IsPublic)
+					continue;
+
+				m_interpreter.DeclareAndLink("Cocktail." + m.Name, m);
 			}
 		}
 	}

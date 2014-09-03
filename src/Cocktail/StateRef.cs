@@ -6,7 +6,8 @@ namespace Cocktail
 
 	public interface IScope
 	{
-		object Dereference(TStateId sid);
+		State Dereference(TStateId sid);
+		State Dereference(TStateId sid, string refType);
 	}
 
 	public abstract class StateRef
@@ -71,39 +72,39 @@ namespace Cocktail
 		}
 	}
 
-	// DEPRECATED
-	public class _RemoteStateRef : StateRef
-	{
-		public _RemoteStateRef(TStateId stateId, string refType)
-			: base(stateId, refType)
-		{
-		}
+	//// DEPRECATED
+	//public class _RemoteStateRef : StateRef
+	//{
+	//    public _RemoteStateRef(TStateId stateId, string refType)
+	//        : base(stateId, refType)
+	//    {
+	//    }
 
-		public object GetObject(Spacetime scope)
-		{
-			var state = NamingSvcClient.Instance.GetObject(StateId.ToString(), m_refType);
-			return state;
-		}
+	//    public object GetObject(Spacetime scope)
+	//    {
+	//        var state = NamingSvcClient.Instance.GetObject(StateId.ToString(), m_refType);
+	//        return state;
+	//    }
 
-		public override void Sync()
-		{
-			//TODO: send it back, with version checking and merging
-		}
+	//    public override void Sync()
+	//    {
+	//        //TODO: send it back, with version checking and merging
+	//    }
 
-		public override T GetField<T>(string name)
-		{
-			var state = NamingSvcClient.Instance.GetObject(StateId.ToString(), m_refType);
-			var type = state.GetType();
-			return (T)type.GetField(name).GetValue(state);
-		}
+	//    public override T GetField<T>(string name)
+	//    {
+	//        var state = NamingSvcClient.Instance.GetObject(StateId.ToString(), m_refType);
+	//        var type = state.GetType();
+	//        return (T)type.GetField(name).GetValue(state);
+	//    }
 
-		public override void SetField<T>(string name, T val)
-		{
-			var state = NamingSvcClient.Instance.GetObject(StateId.ToString(), m_refType);
-			var type = state.GetType();
-			type.GetField(name).SetValue(state, val);
-		}
-	}
+	//    public override void SetField<T>(string name, T val)
+	//    {
+	//        var state = NamingSvcClient.Instance.GetObject(StateId.ToString(), m_refType);
+	//        var type = state.GetType();
+	//        type.GetField(name).SetValue(state, val);
+	//    }
+	//}
 
 	public class ScopedStateRef : StateRef
 	{

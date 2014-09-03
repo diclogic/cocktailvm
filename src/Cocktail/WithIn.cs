@@ -2,27 +2,33 @@
 using System;
 using Cocktail;
 using System.Threading;
+using System.Collections.Generic;
 
 
 namespace Cocktail
 {
 	public class WithIn : IDisposable
 	{
-		static ThreadLocal<Spacetime> m_tls = new ThreadLocal<Spacetime>(() => null);
+		static ThreadLocal<List<Spacetime>> ms_tls = new ThreadLocal<List<Spacetime>>(() => new List<Spacetime>());
+
+		List<Spacetime> m_localStack;
 
 		public WithIn(Spacetime st)
 		{
-			m_tls.Value = st;
+			m_localStack = ms_tls.Value;
+
+			m_localStack.Add(st);
 		}
 
 		public static Spacetime GetWithin()
 		{
-			return m_tls.Value;
+			var m_localStack = ms_tls.Value;
+			return m_localStack[m_localStack.Count - 1];
 		}
 
 		public void Dispose()
 		{
-			m_tls.Value = null;
+			m_localStack.RemoveAt(m_localStack.Count - 1);
 		}
 	}
 }

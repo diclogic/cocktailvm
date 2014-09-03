@@ -49,6 +49,15 @@ namespace DOA
 			}
 		}
 
+		public TStateId? GetSpacetimeStorageSID(IHId stHid)
+		{
+			Spacetime st;
+			if (!m_spaceTimes.TryGetValue(stHid, out st))
+				return null;
+
+			return st.StorageSID;
+		}
+
 		internal PrePullRequestResult PrePullRequest(IHId idPuller, IHId idRequester, IHEvent evtOriginal, IEnumerable<TStateId> affectedStates)
 		{
 			return m_spaceTimes[idPuller].PrePullRequest(idRequester, evtOriginal, affectedStates);

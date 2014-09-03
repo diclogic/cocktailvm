@@ -70,11 +70,14 @@ namespace Demos
 			// create 2 accounts
 			for (int ii = 0; ii < 2; ++ii)
 			{
-				var newAccount = m_spacetimes[ii].CreateState((st, stamp) => AccountFactory(st, stamp, ii));
+				// firstly create into same ST then we migrate one to another ST
+				var newAccount = m_spacetimes[0].CreateState((st, stamp) => AccountFactory(st, stamp, ii));
 				m_namingSvc.RegisterObject(newAccount.StateId.ToString(), newAccount.GetType().ToString(), newAccount);
 				m_accountStates.Add(newAccount);
 				m_accounts.Add(new ScopedStateRef(newAccount.StateId, newAccount.GetType().ToString()));
 			}
+
+			m_spacetimes[1].Immigrate(m_accounts[1].StateId, m_spacetimes[0].ID);
 
 			// deposit some initial money
 			using (new WithIn(m_spacetimes[0]))

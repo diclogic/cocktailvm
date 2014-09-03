@@ -10,17 +10,24 @@ namespace Cocktail
 {
 	public class InvokerAttribute : Attribute { }
 
-	
+
 	public static class InvocationBuilder
 	{
-		public static T Build<T>()
+		public static T Build<T>() where T : class { return Build<T>(string.Empty); }
+
+		public static T Build<T>(string ns)
 			where T: class
 		{
-			var implType = BuildType(typeof(T));
+			var implType = BuildType(typeof(T), ns);
 			return Activator.CreateInstance(implType) as T;
 		}
 
 		public static Type BuildType(Type interf)
+		{
+			return BuildType(interf, string.Empty);
+		}
+
+		public static Type BuildType(Type interf, string ns)
 		{
 			// must be interface
 			if (!interf.IsInterface)
@@ -54,7 +61,7 @@ namespace Cocktail
 			// methods
 			foreach (var ifMethod in interf.GetMethods())
 			{
-				GenerateMethod(typeBuilder, ifMethod, source);
+				GenerateMethod(ns, typeBuilder, ifMethod, source);
 			}
 
 			return typeBuilder.CreateType();
@@ -69,7 +76,7 @@ namespace Cocktail
 		///         .Execute("Deposit", Utils.MakeArgList("account", account), amount);
 		/// }
 		/// </summary>
-		private static void GenerateMethod(TypeBuilder typeBuilder, MethodInfo ifMethod, ISymbolDocumentWriter source)
+		private static void GenerateMethod(string ns, TypeBuilder typeBuilder, MethodInfo ifMethod, ISymbolDocumentWriter source)
 		{
 			var ifMethodParams = ifMethod.GetParameters();
 
@@ -118,7 +125,7 @@ namespace Cocktail
 
 			// var ST = WithIn.GetWithin();
 			// if (ST==null) throw RuntimeExc...
-			// ST.Execute("Deposit", ..., params object[] args)
+			// ST.Execute("[ns.]Deposit", ..., params object[] args)
 			{
 				var lableOK = il.DefineLabel();
 
@@ -136,7 +143,7 @@ namespace Cocktail
 				MarkTraceablePoint(il, source, new StackFrame(true));
 				il.MarkLabel(lableOK);
 				il.Emit(OpCodes.Ldloc, localST);
-				il.Emit(OpCodes.Ldstr, ifMethod.Name);
+				il.Emit(OpCodes.Ldstr, (string.IsNullOrEmpty(ns) ? "" : ns + ".") + ifMethod.Name);
 				il.Emit(OpCodes.Ldloc, localStateArgs);
 
 				var constParams = ifMethodParams.Skip(1).Where(x => x.ParameterType != typeof(StateRef));

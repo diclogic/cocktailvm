@@ -19,7 +19,7 @@ namespace Demos
     {
         delegate void GodPushDeleg(Particle p,Vector3 v);
         List<Particle> m_particles = new List<Particle>();
-        Interpreter kernel = Interpreter.Instance;
+        LangVM kernel = LangVM.Instance;
         AABB m_worldBox;
         double m_accumulate = 0;
         Random m_rand = new Random();
