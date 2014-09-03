@@ -64,17 +64,17 @@ namespace Cocktail.Interp
 
 
     /// <summary>
-    /// The prototype of cocktail interpreter backend
+    /// The prototype of Cocktail VM
     /// </summary>
-	public class Interpreter
+	public class LangVM
 	{
-		public static Interpreter Instance = new Interpreter();
+		public static LangVM Instance = new LangVM();
 
 		// TODO: support function overloading
 		Dictionary<string, List<FunctionSignature>> m_declGroups = new Dictionary<string, List<FunctionSignature>>();
 		Dictionary<FunctionSignature, Function> m_functionBodies;
 
-		public Interpreter()
+		public LangVM()
 		{
 			m_functionBodies = new Dictionary<FunctionSignature, Function>(new FunctionSignatureComparer());
 		}

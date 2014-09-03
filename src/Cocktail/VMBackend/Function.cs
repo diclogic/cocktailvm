@@ -33,6 +33,8 @@ namespace Cocktail.Interp
 				throw new ApplicationException("The invocation doesn't match the form of the event declaration");
 			var argList = Form.GenArgList(scope, states, constArgs).ToArray();
 			m_fn(argList);
+
+			// TODO: remove it, this is not how we sync states
 			foreach (var stateInst in states)
 				stateInst.arg.Sync();
 		}
