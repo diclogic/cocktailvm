@@ -1,13 +1,31 @@
 h1. Backlog (Jia Li)
+
+# Nesting invocation
+#* Priority: 1
+#* Targets:
+#** a chronon can call another chronon
+#** a function can be either chronon or non-chronon 
+
+# Readonly states as parameters
+#* Priority: 1
+
 # State Migration
 #* Priority: 1
 #* Targets:
 #** the ability of states to migrate to another Spacetime(ST)
 #** such change to Spacetimes(departuring and arriving) should also be tracked in the same way as other chronons
 #** 
+
 # Defragment of ITC
 #* Priority: 5
 #* Desc:
 #** because of the nature of the ITC (it's a binary tree), ITC utilizes this fact to reduce entropy of unnecessary versioning detail
 #** over thousands of state migrations the tree would contain lots of fragment
 #** the difficulty here is: the ITC tree is global, so how can we rehash it efficiently 
+
+# Spacetime replica
+#* Priority: 9
+#* Desc:
+#** having replica can help to achieve necessary data redundency for failover and parallel readable source
+
+
