@@ -53,6 +53,7 @@
     <Compile Include="State.cs" />
     <Compile Include="StateAggregation.cs" />
     <Compile Include="StatePatching.cs" />
+    <Compile Include="StatePermission.cs" />
     <Compile Include="StateRef.cs" />
     <Compile Include="HTS\IEvent.cs" />
     <Compile Include="HTS\IIdentity.cs" />
