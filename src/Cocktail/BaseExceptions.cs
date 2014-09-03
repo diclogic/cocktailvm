@@ -5,18 +5,24 @@ using System.Text;
 
 namespace Cocktail
 {
-    public class CompileTimeException : ApplicationException
+	public class BaseException : Exception
+    {
+        public BaseException(string reason) : base(reason) { }
+    }
+
+    public class CompileTimeException : BaseException
     {
         public CompileTimeException(string reason) : base(reason) { }
     }
 
-	public class JITCompileException : ApplicationException
+	public class JITCompileException : BaseException
 	{
 		public JITCompileException(string reason) : base(reason) { }
 	}
 
-	public class RuntimeException : ApplicationException
+	public class RuntimeException : BaseException
 	{
         public RuntimeException(string reason) : base(reason) { }
+        public RuntimeException(string reason, params object[] args) : this(string.Format(reason,args)) { }
 	}
 }
