@@ -16,6 +16,20 @@ h1. Backlog (Jia Li)
 #** such change to Spacetimes(departuring and arriving) should also be tracked in the same way as other chronons
 #** 
 
+# Trigger on data
+#* Priority: 5
+#* Link: Conditional patch/sync flag
+#* Desc:
+#** in the Accounting case, when the balance drop below zero some event should be triggerred
+
+# Conditional patch/sync flag
+#* Priority: 5
+#* Link: Trigger on data
+#* Desc:
+#** user can put a condition/constraint on sync flag
+#** such condition should be propagated to all other ST that shows interest on the field, so that their sync logic can work consistently
+#** Further more, we can probably also introduce instance-specific conditions (the current one is type-specific)
+
 # Defragment of ITC
 #* Priority: 5
 #* Desc:
