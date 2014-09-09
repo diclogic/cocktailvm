@@ -1,5 +1,12 @@
 h1. Backlog (Jia Li)
 
+# Trigger on data
+#* Priority: 1
+#* Link: Conditional patch/sync flag
+#* Desc:
+#** in the Accounting case, when the balance drop below zero some event should be triggerred
+#** is that all invocation can be abstracted as the triggering of responses to events?
+
 # Nesting invocation
 #* Priority: 1
 #* Targets:
@@ -15,12 +22,6 @@ h1. Backlog (Jia Li)
 #** the ability of states to migrate to another Spacetime(ST)
 #** such change to Spacetimes(departuring and arriving) should also be tracked in the same way as other chronons
 #** 
-
-# Trigger on data
-#* Priority: 5
-#* Link: Conditional patch/sync flag
-#* Desc:
-#** in the Accounting case, when the balance drop below zero some event should be triggerred
 
 # Conditional patch/sync flag
 #* Priority: 5
