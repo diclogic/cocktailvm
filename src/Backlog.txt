@@ -31,6 +31,9 @@ h1. Backlog (Jia Li)
 #** such condition should be propagated to all other ST that shows interest on the field, so that their sync logic can work consistently
 #** Further more, we can probably also introduce instance-specific conditions (the current one is type-specific)
 
+# Write/out-only state parameters
+#* Priority: 5
+
 # Defragment of ITC
 #* Priority: 5
 #* Desc:
