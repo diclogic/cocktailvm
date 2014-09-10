@@ -66,6 +66,11 @@ namespace Cocktail.Interp
     /// <summary>
     /// The prototype of Cocktail VM
     /// </summary>
+	/// <remarks>
+	/// Currently the VM accepts runtime/dynamic argument list from causality tracking and data sync logic,
+	/// then execute actual cocktail-style c# bin code with dynamic invocation.
+	/// this should be able to be compiled for better performance
+	/// </remarks>
 	public class LangVM
 	{
 		public static LangVM Instance = new LangVM();
