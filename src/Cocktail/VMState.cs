@@ -10,7 +10,9 @@ using System.Reflection;
 namespace Cocktail
 {
 	/// <summary>
-	/// VM is a special state. It has version. It can only be changed/updated only by deployment system
+	/// This class wraps VM into a special state.
+	/// It has version.
+	/// It can only be changed/updated only by deployment system
 	/// </summary>
 	[StatePermission(Flags = EPermission.Deploy | EPermission.Admin)]
 	public class VMState : State

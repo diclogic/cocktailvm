@@ -4,17 +4,23 @@ using System.Linq;
 using System.Text;
 using Demos.States;
 using Cocktail;
+using Cocktail.HTS;
 
-namespace Demos
+namespace Demos.Accounting
 {
-	[Invoker]
-	public interface IAccounting
-	{
-		//void Test(StateRef account);
-		void Deposit(StateRef account, float amount);
-		void Transfer(StateRef fromAcc, StateRef toAcc, float amount);
-		void Withdraw(StateRef account, float amount);
-	}
+	/// <summary>
+	/// Monitored account that can't be commutative because we need immediate response to special value changes
+	/// </summary>
+    [State]
+    public class MonitoredAccount : State
+    {
+		[StaticTrigger(Triggers.Bankrupt, "val <= 0")]
+		[StateField(PatchKind = FieldPatchCompatibility.Swap)]
+		public float Balance;
+
+		public MonitoredAccount(IHTimestamp stamp) : base(stamp) { }
+		public MonitoredAccount(TStateId sid, IHTimestamp stamp) : base(sid, stamp.ID, stamp.Event, StatePatchMethod.Auto) { }
+    }
 
     public static class Accounting
     {
@@ -53,4 +59,23 @@ namespace Demos
 			account.Balance -= amount;
 		}
     }
+
+	public static class Triggers
+	{
+		public static void Bankrupt(State acc)
+		{
+
+		}
+
+	}
+
+	[CSharpInvoker]
+	public interface IAccounting
+	{
+		//void Test(StateRef account);
+		void Deposit(StateRef account, float amount);
+		void Transfer(StateRef fromAcc, StateRef toAcc, float amount);
+		void Withdraw(StateRef account, float amount);
+	}
+
 }

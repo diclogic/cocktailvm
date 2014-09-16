@@ -8,7 +8,7 @@ using System.Reflection.Emit;
 
 namespace Cocktail
 {
-	public class InvokerAttribute : Attribute { }
+	public class CSharpInvokerAttribute : Attribute { }
 
 
 	public static class InvocationBuilder

@@ -67,7 +67,7 @@ namespace Cocktail
 		}
 	}
 
-	public abstract class State //: ICloneable
+	public abstract partial class State //: ICloneable
 	{
 		static Random m_seed = new Random();
 

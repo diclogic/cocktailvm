@@ -147,6 +147,7 @@ namespace Cocktail.Interp
 			if (states.Any(kv => kv.Value == null))
 				throw new RuntimeException("state argument can't be null");
 
+			// ----------- Find Function -----------
 			var stateParams = GenStateParams(states);
 			var constTypes = constArgs.Select((o) => o == null ? typeof(object) : o.GetType());
             var sign = Find(eventName , stateParams , constTypes );
@@ -162,7 +163,21 @@ namespace Cocktail.Interp
 											, eventName
 											, MakeSignatureString(stateParams, constTypes) ));
 
+			// --------- Execute --------------
 			func.Exec(scope, GenStateParamInsts(states), constArgs);
+
+			// --------- Fire Inline Triggers -------
+			// the result of inline trigger is in same chronon
+			// the trigger can only do:
+			// 1) access/modify the state it belongs to
+			// 2) add new entry to the pending chronon list of the executing ST
+			// 3) fail the chronon
+			foreach (var sref in states)
+			{
+				var state = sref.Value.GetObject(scope);
+				state.FireInlineTriggers();
+			}
+
 		}
 
 

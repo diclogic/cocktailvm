@@ -25,7 +25,7 @@ namespace Cocktail
 			m_refType = refType;
 		}
 		public string GetRefType() { return m_refType; }
-		//public virtual object GetInterface() { return null; }
+		public abstract State GetObject(IScope scope);
 
 		public virtual void Sync() { throw new NotImplementedException(); }
 
@@ -43,7 +43,7 @@ namespace Cocktail
 			m_impl = impl;
 		}
 
-		public object GetObject() { return m_impl; }
+		public override State GetObject(IScope scope) { return m_impl; }
 	}
 
 	public class _LocalStateRef<T> : DirectStateRef
@@ -113,7 +113,7 @@ namespace Cocktail
 		{
 		}
 
-		public object GetObject(IScope scope)
+		public override State GetObject(IScope scope)
 		{
 			return scope.Dereference(StateId);
 		}

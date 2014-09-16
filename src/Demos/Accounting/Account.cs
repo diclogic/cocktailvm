@@ -18,16 +18,4 @@ namespace Demos.States
 		public Account(TStateId sid, IHTimestamp stamp) : base(sid, stamp.ID, stamp.Event, StatePatchMethod.Auto) { }
     }
 
-	/// <summary>
-	/// Monitored account that can't be commutative because we need immediate response to special value changes
-	/// </summary>
-    [State]
-    public class MonitoredAccount : State
-    {
-		[StateField(PatchKind = FieldPatchCompatibility.Swap)]
-		public float Balance;
-
-        public MonitoredAccount( IHTimestamp stamp) : base(stamp) { }
-		public MonitoredAccount(TStateId sid, IHTimestamp stamp) : base(sid, stamp.ID, stamp.Event, StatePatchMethod.Auto) { }
-    }
 }
