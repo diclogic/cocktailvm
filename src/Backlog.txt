@@ -1,5 +1,21 @@
 h1. Backlog (Jia Li)
 
+# port bullet physics engine
+#* Priority: 0
+#* Targets:
+#** port bullet or any other c++/c# physics engine, use it to drive the development
+
+# HBase storage driver
+#* Priority: 1
+#* Targets:
+#** refactor SpacetimeStorage to support extension with drivers
+#** write storage driver for HBase
+
+# HDFS-based name server
+#* Priority: 1
+#* Targets:
+#** replace the psudo name server with HDFS-based implementation
+
 # Trigger on data
 #* Priority: 1
 #* Link: Conditional patch/sync flag
