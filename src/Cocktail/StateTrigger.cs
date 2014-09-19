@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Linq.Expressions;
+using System.Threading;
 
 namespace Cocktail
 {
@@ -44,7 +45,7 @@ namespace Cocktail
 			condition.Body
 		}
 
-		public void Fire(State state)
+		public void TryFire(State state)
 		{
 			if (m_condition(state))
 				m_response(state);
@@ -54,20 +55,27 @@ namespace Cocktail
 
 	public abstract partial class State
 	{
-		protected List<StateTrigger> m_triggers;
-		protected Dictionary<string, StateTrigger> m_triggerLookup;
+		protected Dictionary<int, StateTrigger> m_triggers;
+		int m_idx = 0;
 
-		public void RegisterInlineTrigger(Action<State> response, string condition)
+		public int RegisterInlineTrigger(Action<State> response, LambdaExpression condition)
 		{
-
+			var tr = new StateTrigger(GetType(), response, condition);
+			var newIdx = Interlocked.Increment(ref m_idx);
+			m_triggers.Add(newIdx, tr);
+			return newIdx;
 		}
 
-		public void FireInlineTriggers(IEnumerable<string> affectedFields)
+		public void UnregisterInlineTrigger(int handle)
 		{
-			// TODO: only fire those triggers that cares one of those modified fields
-			foreach (var tr in m_triggers)
+			m_triggers.Remove(handle);
+		}
+
+		public void FireInlineTriggers()
+		{
+			foreach (var tr in m_triggers.Values)
 			{
-				tr.
+				tr.TryFire(this);
 			}
 		}
 	};
