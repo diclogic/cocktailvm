@@ -10,8 +10,8 @@ namespace Cocktail
 	public class StaticTriggerAttribute : Attribute
 	{
 		public Action<State> Trigger { get; set; }
-		public Expression Condition { get; set; }
-		public StaticTriggerAttribute(Action<State> trigger, Expression condition)
+		public Func<State,bool> Condition { get; set; }
+		public StaticTriggerAttribute(Action<State> trigger, Func<State,bool> condition)
 		{
 			Trigger = trigger;
 			Condition = condition;
@@ -22,27 +22,10 @@ namespace Cocktail
 	{
 		private Action<State> m_response;
 		private Func<State, bool> m_condition;
-		public StateTrigger(Type stateType, Action<State> response, LambdaExpression condition)
+		public StateTrigger(Type stateType, Action<State> response, Func<State, bool> condition)
 		{
 			m_response = response;
-			m_condition = CompileCondition(condition,stateType);
-		}
-
-		Func<State,bool> CompileCondition(LambdaExpression condition, Type stateType)
-		{
-			foreach (var param in condition.Parameters)
-			{
-				param.Name;
-
-			}
-			
-			BlockExpression wrapper = Expression.Block(
-				new[] {Expression.Parameter(typeof(string), "")},
-				Expression.Assign(),
-				Expression.Call()
-				);
-			fn.Invoke();
-			condition.Body
+			m_condition = condition;
 		}
 
 		public void TryFire(State state)
@@ -50,7 +33,6 @@ namespace Cocktail
 			if (m_condition(state))
 				m_response(state);
 		}
-
 	}
 
 	public abstract partial class State
@@ -58,7 +40,7 @@ namespace Cocktail
 		protected Dictionary<int, StateTrigger> m_triggers;
 		int m_idx = 0;
 
-		public int RegisterInlineTrigger(Action<State> response, LambdaExpression condition)
+		public int RegisterInlineTrigger(Action<State> response, Func<State, bool> condition)
 		{
 			var tr = new StateTrigger(GetType(), response, condition);
 			var newIdx = Interlocked.Increment(ref m_idx);

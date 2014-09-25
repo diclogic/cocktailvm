@@ -5,6 +5,7 @@ using System.Text;
 using Demos.States;
 using Cocktail;
 using Cocktail.HTS;
+using System.Linq.Expressions;
 
 namespace Demos.Accounting
 {
@@ -12,9 +13,9 @@ namespace Demos.Accounting
 	/// Monitored account that can't be commutative because we need immediate response to special value changes
 	/// </summary>
     [State]
+	//[StaticTrigger(Triggers.OnBankrupt, (State s) => (s as MonitoredAccount).Balance <= 0 )]
     public class MonitoredAccount : State
     {
-		[StaticTrigger(Triggers.Bankrupt, "val <= 0")]
 		[StateField(PatchKind = FieldPatchCompatibility.Swap)]
 		public float Balance;
 
@@ -62,7 +63,7 @@ namespace Demos.Accounting
 
 	public static class Triggers
 	{
-		public static void Bankrupt(State acc)
+		public static void OnBankrupt(State acc)
 		{
 
 		}

@@ -5,6 +5,7 @@ using System.Text;
 
 namespace Cocktail
 {
+	[CSharpInvoker]
 	public interface IStdLib
 	{
 		void Migrate(StateRef arriving, StateRef departuring, TStateId immigrant);

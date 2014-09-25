@@ -10,7 +10,7 @@ using OpenTK.Graphics;
 using OpenTK.Graphics.OpenGL;
 using Skeleton;
 
-namespace Demos
+namespace Demos.Accounting
 {
 	[MultiModelContent]
 	public class DistributedAccountingDemo : BaseAccountingDemo
@@ -41,7 +41,7 @@ namespace Demos
 
 		public override IPresent GetPresent()
 		{
-			return new Present(m_accounts.Select(a => PseudoSyncMgr.Instance.AggregateDistributedDelta(a.StateId)).ToArray()
+			return new Present(m_accounts.Select(a => ServiceManager.SyncService.AggregateDistributedDelta(a.StateId)).ToArray()
 							, m_worldBox);
 		}
 	}

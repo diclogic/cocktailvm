@@ -8,16 +8,16 @@ using Cocktail.HTS;
 namespace DOA
 {
 
-	public class PseudoSyncMgr
+
+	public class PseudoSyncMgr : ISyncService, ILocatingService
 	{
 		private Dictionary<IHId, Spacetime> m_spaceTimes = new Dictionary<IHId, Spacetime>();
 		private object m_lock = new object();
 
-		public static PseudoSyncMgr Instance = new PseudoSyncMgr();
 		private Spacetime m_vmST;
 		private TStateId m_vmStateId;
 
-		private PseudoSyncMgr() { }
+		internal PseudoSyncMgr() { }
 
 		public void Reset()
 		{
@@ -58,7 +58,7 @@ namespace DOA
 			return st.StorageSID;
 		}
 
-		internal PrePullRequestResult PrePullRequest(IHId idPuller, IHId idRequester, IHEvent evtOriginal, IEnumerable<TStateId> affectedStates)
+		public PrePullRequestResult PrePullRequest(IHId idPuller, IHId idRequester, IHEvent evtOriginal, IEnumerable<TStateId> affectedStates)
 		{
 			return m_spaceTimes[idPuller].PrePullRequest(idRequester, evtOriginal, affectedStates);
 		}

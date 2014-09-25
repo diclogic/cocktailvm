@@ -33,7 +33,7 @@ namespace Cocktail
 			if (!interf.IsInterface)
 				throw new JITCompileException(String.Format("Can't create invocation, the type must be an interface: {0}", interf.FullName));
 
-			if (!interf.GetCustomAttributes(typeof(InvokerAttribute), false).Any())
+			if (!interf.GetCustomAttributes(typeof(CSharpInvokerAttribute), false).Any())
 				throw new JITCompileException(string.Format("Can't create invocation, the type must have [Invoker] attribute: {0}", interf.FullName));
 
 

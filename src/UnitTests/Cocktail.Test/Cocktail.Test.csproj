@@ -5,11 +5,11 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{EDC79724-FBA0-4FD4-8EAD-6DC042175DCF}</ProjectGuid>
+    <ProjectGuid>{BF621C27-EEE8-40B4-808A-B8EC3F7F1CD2}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>Cocktail</RootNamespace>
-    <AssemblyName>Cocktail</AssemblyName>
+    <RootNamespace>Cocktail.Test</RootNamespace>
+    <AssemblyName>Cocktail.Test</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
@@ -17,7 +17,7 @@
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
-    <OutputPath>..\..\lib\Debug\</OutputPath>
+    <OutputPath>bin\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -38,51 +38,32 @@
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
+    <Reference Include="xunit">
+      <HintPath>..\..\SDKs\nunit\xunit-1.9.1\xunit.dll</HintPath>
+    </Reference>
+    <Reference Include="xunit.extensions">
+      <HintPath>..\..\SDKs\nunit\xunit-1.9.1\xunit.extensions.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="BaseExceptions.cs" />
-    <Compile Include="DOA\DoaNamingSvcClient.cs" />
-    <Compile Include="DOA\SyncManager.cs" />
-    <Compile Include="ILocatingService.cs" />
-    <Compile Include="ISyncService.cs" />
-    <Compile Include="ServiceManager.cs" />
-    <Compile Include="StateId.cs" />
-    <Compile Include="StateTrigger.cs" />
-    <Compile Include="VMBackend\Function.cs" />
-    <Compile Include="VMBackend\LangVM.cs" />
-    <Compile Include="InvocationBuilder.cs" />
-    <Compile Include="VMBackend\Parameter.cs" />
+    <Compile Include="CoreTest.cs" />
+    <Compile Include="TriggerTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Spacetime.cs" />
-    <Compile Include="SpacetimeStorage.cs" />
-    <Compile Include="State.cs" />
-    <Compile Include="StateAggregation.cs" />
-    <Compile Include="StatePatching.cs" />
-    <Compile Include="StatePermission.cs" />
-    <Compile Include="StateRef.cs" />
-    <Compile Include="HTS\IEvent.cs" />
-    <Compile Include="HTS\IIdentity.cs" />
-    <Compile Include="HTS\ITimestamp.cs" />
-    <Compile Include="stdlib\StdLib.cs" />
-    <Compile Include="VMSpacetime.cs" />
-    <Compile Include="VMState.cs" />
-    <Compile Include="WithIn.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Cocktail.System\Cocktail.System.csproj">
+    <ProjectReference Include="..\..\Cocktail.System\Cocktail.System.csproj">
       <Project>{4C9E24DA-5B89-4785-889A-15AC228598AD}</Project>
       <Name>Cocktail.System</Name>
     </ProjectReference>
-    <ProjectReference Include="..\ITCSharp\ITCSharp.csproj">
-      <Project>{D42AA6CC-660E-48BA-921D-63BA35847DD1}</Project>
-      <Name>ITCSharp</Name>
+    <ProjectReference Include="..\..\Cocktail\Cocktail.csproj">
+      <Project>{EDC79724-FBA0-4FD4-8EAD-6DC042175DCF}</Project>
+      <Name>Cocktail</Name>
     </ProjectReference>
-    <ProjectReference Include="..\MathLib\MathLib.csproj">
-      <Project>{B6DCD891-699A-4E04-98BA-565C9C7D8A64}</Project>
-      <Name>MathLib</Name>
+    <ProjectReference Include="..\..\Demos\Demos.csproj">
+      <Project>{C318BDB0-D222-47E4-8839-017459FE48F2}</Project>
+      <Name>Demos</Name>
     </ProjectReference>
   </ItemGroup>
-  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

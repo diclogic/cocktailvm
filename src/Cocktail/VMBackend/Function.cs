@@ -112,10 +112,10 @@ namespace Cocktail.Interp
 			var stateRefType = spi.arg.GetType();
 			if (typeof(DirectStateRef).IsAssignableFrom(stateRefType))
 			{
-				var ret = (spi.arg as DirectStateRef).GetObject();
+				var ret = (spi.arg as DirectStateRef).GetObject(null);
 				return new KeyValuePair<object, int>(ret, spi.index);
 			}
-			else if (stateRefType == typeof(ScopedStateRef))
+			else if (typeof(ScopedStateRef).IsAssignableFrom(stateRefType))
 			{
 				var ret = (spi.arg as ScopedStateRef).GetObject(scope);
 				return new KeyValuePair<object, int>(ret, spi.index);

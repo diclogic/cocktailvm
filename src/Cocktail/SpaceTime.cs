@@ -28,25 +28,6 @@ namespace Cocktail
 
 	}
 
-	public struct SpacetimeSnapshot
-	{
-		public IHTimestamp Timestamp;
-		public IEnumerable<State> States;
-		public ILookup<TStateId, StatePatch> Redos;
-
-		public IEnumerable<KeyValuePair<TStateId, IHEvent>> LatestEvents
-		{
-			get
-			{
-				foreach (var state in Redos)
-					yield return new KeyValuePair<TStateId, IHEvent>( state.Key,
-						state.Aggregate(HTSFactory.CreateZeroEvent(),
-										(acc, patch) => acc.KnownBy(patch.ToEvent) ? patch.ToEvent : acc)
-						);
-			}
-		}
-	}
-
 	public static class SpacetimeUtils
 	{
 		public static ILookup<TStateId,IHEvent> ReduceLatestStateEvents(IEnumerable<KeyValuePair<TStateId, IHEvent>> input)
@@ -126,19 +107,31 @@ namespace Cocktail
 		}
 
 		public Spacetime(IHTimestamp stamp, IHIdFactory idFactory, IEnumerable<State> initialStates)
+			:this(stamp, idFactory, initialStates, false)
+		{
+		}
+
+		public Spacetime(IHTimestamp stamp, IHIdFactory idFactory, IEnumerable<State> initialStates, bool bSkipInitialVM)
 		{
 			m_currentTime = stamp;
 			m_idFactory = idFactory;
 			m_vm = new VMState(stamp);
 
-			// every ST must have the minimal VM since the very beginning, VM's life time has no beginning nor end
-			ExternalSTEntry vmST;
-			vmST.IsListeningTo = true;
-			vmST.SpacetimeId = m_vm.SpacetimeID;
-			vmST.LatestUpateTime = HTSFactory.CreateZeroEvent();
-			vmST.LocalStates = Enumerable.Repeat<State>(m_vm, 1).ToDictionary(s => s.StateId);
+			if (bSkipInitialVM)
+			{
+				m_storageComponent = new SpacetimeStorage(stamp, initialStates, Enumerable.Empty<ExternalSTEntry>());
+			}
+			else
+			{
+				// every ST must have the minimal VM since the very beginning, VM's life time has no beginning nor end
+				ExternalSTEntry vmST;
+				vmST.IsListeningTo = true;
+				vmST.SpacetimeId = m_vm.SpacetimeID;
+				vmST.LatestUpateTime = HTSFactory.CreateZeroEvent();
+				vmST.LocalStates = Enumerable.Repeat<State>(m_vm, 1).ToDictionary(s => s.StateId);
 
-			m_storageComponent = new SpacetimeStorage(stamp, initialStates, Enumerable.Repeat(vmST, 1));
+				m_storageComponent = new SpacetimeStorage(stamp, initialStates, Enumerable.Repeat(vmST, 1));
+			}
 		}
 
 		public State CreateState(Func<Spacetime, IHTimestamp, State> constructor)
@@ -372,7 +365,7 @@ namespace Cocktail
 				var requestedSTIDs = new List<IHId>();
 				foreach (var fst in pulledSTs)
 				{
-					bApproved &= PseudoSyncMgr.Instance.PullRequest(fst.Key, this.ID, evtFinal, redo.LocalChanges.Where(kv => fst.Contains(kv.Key)).ToLookup(kv => kv.Key, kv => kv.Value));
+					bApproved &= ServiceManager.SyncService.PullRequest(fst.Key, this.ID, evtFinal, redo.LocalChanges.Where(kv => fst.Contains(kv.Key)).ToLookup(kv => kv.Key, kv => kv.Value));
 					requestedSTIDs.Add(fst.Key);
 				}
 
@@ -404,7 +397,7 @@ namespace Cocktail
 		/// </summary>
 		private static IDictionary<IHId, SpacetimeSnapshot> FetchForeignSpacetime(IEnumerable<IHId> foreignSTIDs, IHEvent evtUpto)
 		{
-			return foreignSTIDs.Select(id => PseudoSyncMgr.Instance.GetSpacetime(id, evtUpto))
+			return foreignSTIDs.Select(id => ServiceManager.LocatingService.GetSpacetime(id, evtUpto))
 										.Where(val => val.HasValue)
 										.ToDictionary(val => val.Value.Timestamp.ID, val => val.Value);
 		}
@@ -445,7 +438,7 @@ namespace Cocktail
 			// And because we know who is going to be written/PullRequested, we can give heads-up to them beforehand
 			foreach (var st in pulledSTs)
 			{
-				var ret = PseudoSyncMgr.Instance.PrePullRequest(st.Key, this.ID, evtOriginal, st);
+				var ret = ServiceManager.SyncService.PrePullRequest(st.Key, this.ID, evtOriginal, st);
 				if (ret >= PrePullRequestResult.Succeeded)
 					continue;
 
@@ -680,7 +673,7 @@ namespace Cocktail
 			if (!m_storageComponent.HasState(immigrantId))
 				throw new RuntimeException("Failed to immigrate `{0}` to `{1}`: not in board yet", immigrantId, departuringST);
 
-			var sidOrNot = PseudoSyncMgr.Instance.GetSpacetimeStorageSID(departuringST);
+			var sidOrNot = ServiceManager.LocatingService.GetSpacetimeStorageSID(departuringST);
 			if (!sidOrNot.HasValue)
 				throw new ApplicationException(string.Format("Unable to find storage for ST `{0}`", departuringST));
 

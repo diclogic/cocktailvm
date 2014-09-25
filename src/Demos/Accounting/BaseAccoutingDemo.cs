@@ -13,7 +13,7 @@ using Core.Aux.System;
 
 
 
-namespace Demos
+namespace Demos.Accounting
 {
 	public abstract class BaseAccountingDemo : BaseModel
 	{
@@ -24,7 +24,7 @@ namespace Demos
 		protected List<Spacetime> m_spacetimes = new List<Spacetime>();
 		protected IHIdFactory m_idFactory;
 		protected VMSpacetime m_vmST;
-		protected NamingSvcClient m_namingSvc;
+		//protected NamingSvcClient m_namingSvc;
 		protected IAccounting m_accountingInvoker;
 
 		// trivial
@@ -33,19 +33,20 @@ namespace Demos
 		public BaseAccountingDemo()
 		{
 			// reset all global states, to allow model switching
-			NamingSvcClient.Instance.Reset();
-			HIdService.Reset();
-			PseudoSyncMgr.Instance.Reset();
+			ServiceManager.Reset();
 
-			m_namingSvc = NamingSvcClient.Instance;
+			//m_namingSvc = NamingSvcClient.Instance;
 			m_accountingInvoker = InvocationBuilder.Build<IAccounting>();
-			m_idFactory = HIdService.GetFactory();
+			m_idFactory = ServiceManager.HIdFactory;
 			m_vmST = new VMSpacetime(m_idFactory);
 		}
 
 		public override void Init(AABB worldBox)
 		{
 			m_worldBox = worldBox;
+
+			ServiceManager.Init(m_vmST);
+
 			if (!m_vmST.VMExist(typeof(IAccounting)))
 				throw new ApplicationException("Accounting functions are not declared in VM yet");
 
@@ -58,13 +59,12 @@ namespace Demos
 			}
 
 			// fake the globally existing SyncManager
-			PseudoSyncMgr.Instance.Initialize(m_vmST);
 			foreach (var ST in m_spacetimes)
-				PseudoSyncMgr.Instance.RegisterSpaceTime(ST);
+				ServiceManager.LocatingService.RegisterSpaceTime(ST);
 
 			// must pull new VM to use IAccounting
 			foreach (var ST in m_spacetimes)
-				PseudoSyncMgr.Instance.PullFromVmSt(ST.ID);
+				ServiceManager.SyncService.PullFromVmSt(ST.ID);
 
 
 			// create 2 accounts
@@ -72,7 +72,7 @@ namespace Demos
 			{
 				// firstly create into same ST then we migrate one to another ST
 				var newAccount = m_spacetimes[0].CreateState((st, stamp) => AccountFactory(st, stamp, ii));
-				m_namingSvc.RegisterObject(newAccount.StateId.ToString(), newAccount.GetType().ToString(), newAccount);
+				//m_namingSvc.RegisterObject(newAccount.StateId.ToString(), newAccount.GetType().ToString(), newAccount);
 				m_accountStates.Add(newAccount);
 				m_accounts.Add(new ScopedStateRef(newAccount.StateId, newAccount.GetType().ToString()));
 			}

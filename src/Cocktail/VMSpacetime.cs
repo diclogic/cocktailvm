@@ -59,6 +59,9 @@ namespace Cocktail
 
 		public void VMDefine(string funcName, MethodInfo method)
 		{
+			if (string.IsNullOrEmpty(funcName) || method == null)
+				throw new RuntimeException(string.Format("Failed to define function {0}", funcName ?? "<N/A>"));
+
 			ExecuteArgs("Cocktail.DeclareAndLink"
 				, Utils.MakeArgList("VM", new _LocalStateRef<VMState>(m_vm))
 				, new object[] { funcName, method });

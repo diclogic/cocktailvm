@@ -35,24 +35,6 @@ namespace Cocktail.HTS
 		IEnumerable<IHId> CreateChildren(IHId parent, int count);
     }
 
-    public static class HIdService
-    {
-		private static IHIdFactory m_factory = null;
-        static HIdService()
-        {
-        }
-        public static IHIdFactory GetFactory()
-        {
-            var newVal = new ITCIdentityFactory();
-			var oldVal = Interlocked.CompareExchange(ref m_factory, newVal, null);
-            return m_factory;
-        }
-
-		public static void Reset()
-		{
-			m_factory = null;
-		}
-    }
 
     internal class ITCIdentity : IHId
     {

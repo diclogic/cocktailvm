@@ -8,7 +8,7 @@ using MathLib;
 using Skeleton;
 using Core.Aux.System;
 
-namespace Demos
+namespace Demos.Accounting
 {
 	[MultiModelContent]
 	public class ConstrainedAccountingDemo : BaseAccountingDemo
