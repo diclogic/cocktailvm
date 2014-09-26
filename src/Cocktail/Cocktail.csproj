@@ -41,6 +41,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="BaseExceptions.cs" />
+    <Compile Include="ComputeNode.cs" />
     <Compile Include="DOA\DoaNamingSvcClient.cs" />
     <Compile Include="DOA\SyncManager.cs" />
     <Compile Include="ILocatingService.cs" />

@@ -17,12 +17,12 @@ namespace Cocktail
 	{
 		public readonly TStateId VMStateId;
 
-		public VMSpacetime(IHIdFactory idFactory)
-			: base(idFactory.CreateFromRoot(), HTSFactory.CreateZeroEvent(), idFactory)
+		public VMSpacetime(IHId hid, IHIdFactory idFactory)
+			: base(hid, HTSFactory.CreateZeroEvent(), idFactory)
 		{
 			VMStateId = m_vm.StateId;
 			m_storageComponent.AddNativeState(m_vm);
-			DOA.NamingSvcClient.Instance.RegisterObject(VMStateId.ToString(), m_vm.GetType().FullName, m_vm);
+			ServiceManager.LocatingService.RegisterObject(VMStateId, m_vm.GetType().FullName, m_vm);
 		}
 
 		public bool VMExist(Type interf)

@@ -10,7 +10,7 @@ namespace UnitTests.Cocktail
 {
 	public class TriggerTests
 	{
-        [Fact]
+		//[Fact]
         public void InlineTrigger()
         {
             Assert.Equal(0,0);

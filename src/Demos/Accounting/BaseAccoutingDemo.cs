@@ -38,7 +38,7 @@ namespace Demos.Accounting
 			//m_namingSvc = NamingSvcClient.Instance;
 			m_accountingInvoker = InvocationBuilder.Build<IAccounting>();
 			m_idFactory = ServiceManager.HIdFactory;
-			m_vmST = new VMSpacetime(m_idFactory);
+			m_vmST = new VMSpacetime(m_idFactory.CreateFromRoot(), m_idFactory);
 		}
 
 		public override void Init(AABB worldBox)

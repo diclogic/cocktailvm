@@ -6,13 +6,19 @@ using Cocktail.HTS;
 
 namespace Cocktail
 {
+	public enum EReset
+	{
+		Weak,
+		Strong,
+	}
 	public static class ServiceManager
 	{
 		//public static ServiceManager Instance = new ServiceManager();
 
 		public static ILocatingService LocatingService { get; private set; }
 		public static ISyncService SyncService { get; private set; }
-		public static IHIdFactory HIdFactory { get; private set; }
+		public static ComputeNode ComputeNode { get; private set; }
+		public static IHIdFactory HIdFactory { get { return ComputeNode.HIdFactory; } }
 
 		private static DOA.PseudoSyncMgr m_pseudoSync; 
 
@@ -21,7 +27,7 @@ namespace Cocktail
 			m_pseudoSync = new DOA.PseudoSyncMgr();
 			LocatingService = m_pseudoSync;
 			SyncService = m_pseudoSync;
-			HIdFactory = new ITCIdentityFactory();
+			ComputeNode = new ComputeNode(0, 2);
 		}
 
 		public static void Init(VMSpacetime vmST)
@@ -29,10 +35,12 @@ namespace Cocktail
 			m_pseudoSync.Initialize(vmST);
 		}
 
-		public static void Reset()
+		public static void Reset(EReset reset = EReset.Weak)
 		{
 			m_pseudoSync.Reset();
-			HIdFactory = new ITCIdentityFactory();
+
+			if (reset == EReset.Strong)
+				ComputeNode = new ComputeNode(0, 2);
 		}
     }
 }

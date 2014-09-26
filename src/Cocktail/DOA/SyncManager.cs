@@ -17,7 +17,12 @@ namespace DOA
 		private Spacetime m_vmST;
 		private TStateId m_vmStateId;
 
-		internal PseudoSyncMgr() { }
+		private NamingSvcClient m_naming;
+
+		internal PseudoSyncMgr()
+		{
+			m_naming = new NamingSvcClient();
+		}
 
 		public void Reset()
 		{
@@ -27,6 +32,21 @@ namespace DOA
 				m_vmStateId = new TStateId();
 				m_spaceTimes.Clear();
 			}
+		}
+
+		public bool RegisterObject(TStateId sid, string objType, State ptr)
+		{
+			return m_naming.RegisterObject(sid.ToString(), objType, ptr);
+		}
+
+		public State GetObject(TStateId sid, string objType)
+		{
+			return (State)m_naming.GetObject(sid.ToString(), objType);
+		}
+
+		public IHId GetObjectSpaceTimeID(TStateId sid)
+		{
+			return m_naming.GetObjectSpaceTimeID(sid.ToString());
 		}
 
 		public void RegisterSpaceTime(Spacetime st)
@@ -122,5 +142,7 @@ namespace DOA
 		{
 			m_spaceTimes[spacetimeId].PullFromVmSt(m_vmST.Snapshot(HTSFactory.CreateZeroEvent()), m_vmStateId);
 		}
+
+
 	}
 }

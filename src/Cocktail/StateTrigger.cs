@@ -37,7 +37,7 @@ namespace Cocktail
 
 	public abstract partial class State
 	{
-		protected Dictionary<int, StateTrigger> m_triggers;
+		protected Dictionary<int, StateTrigger> m_triggers = new Dictionary<int,StateTrigger>();
 		int m_idx = 0;
 
 		public int RegisterInlineTrigger(Action<State> response, Func<State, bool> condition)

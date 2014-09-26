@@ -35,5 +35,9 @@ namespace Cocktail
 		void RegisterSpaceTime(Spacetime st);
 		TStateId? GetSpacetimeStorageSID(IHId stHid);
 		SpacetimeSnapshot? GetSpacetime(IHId id, IHEvent evtAck);
+
+		bool RegisterObject(TStateId sid, string objType, State ptr);
+		State GetObject(TStateId sid, string objType);
+		IHId GetObjectSpaceTimeID(TStateId sid);
 	}
 }

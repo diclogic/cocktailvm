@@ -14,7 +14,6 @@ namespace UnitTests.Cocktail
 		// SETUP
 		public CoreTestFixture()
 		{
-			ServiceManager.Reset();
 
 		}
 
@@ -28,7 +27,7 @@ namespace UnitTests.Cocktail
 	public class TwoSpacetimeTests : IUseFixture<CoreTestFixture>
 	{
 		IAccounting m_accountingInvoker;
-		IHIdFactory m_idFactory;
+		//IHIdFactory m_idFactory;
 		List<Spacetime> m_spacetimes = new List<Spacetime>();
 		List<MonitoredAccount> m_accountStates = new List<MonitoredAccount>();
 		List<ScopedStateRef> m_accounts = new List<ScopedStateRef>();
@@ -43,30 +42,20 @@ namespace UnitTests.Cocktail
 		public TwoSpacetimeTests()
 		{
 			m_accountingInvoker = InvocationBuilder.Build<IAccounting>();
-			m_idFactory = ServiceManager.HIdFactory;
-			var m_vmST = new VMSpacetime(m_idFactory);
-			m_vmST.VMBind(typeof(IAccounting), typeof(MonitoredAccount));
-
+			var m_vmST = ServiceManager.ComputeNode.VMST;
+			m_vmST.VMBind(typeof(IAccounting), typeof(ConstrainedAccounting));
 
 			ServiceManager.Init(m_vmST);
 
 			Assert.True(m_vmST.VMExist(typeof(IAccounting)));
+		}
 
-			// --- init demo objects ---
+		private void Setup()
+		{
+			var initialST = ServiceManager.ComputeNode.CreateSpacetime();
+			var secondST = ServiceManager.ComputeNode.CreateSpacetime();
+			m_spacetimes.AddRange(new[] { initialST, secondST });
 
-			{
-				var initialST = new Spacetime(m_idFactory.CreateFromRoot(), ITCEvent.CreateZero(), m_idFactory);
-				var secondST = new Spacetime(m_idFactory.CreateFromRoot(), ITCEvent.CreateZero(), m_idFactory);
-				m_spacetimes.AddRange(new[] { initialST, secondST });
-			}
-
-			// fake the globally existing SyncManager
-			foreach (var ST in m_spacetimes)
-				ServiceManager.LocatingService.RegisterSpaceTime(ST);
-
-			// must pull new VM to use IAccounting
-			foreach (var ST in m_spacetimes)
-				ServiceManager.SyncService.PullFromVmSt(ST.ID);
 
 
 			// create 2 accounts
@@ -78,37 +67,50 @@ namespace UnitTests.Cocktail
 				m_accountStates.Add((MonitoredAccount)newAccount);
 				m_accounts.Add(new ScopedStateRef(newAccount.StateId, newAccount.GetType().ToString()));
 			}
+		}
 
-			m_spacetimes[1].Immigrate(m_accounts[1].StateId, m_spacetimes[0].ID);
-
-			// deposit some initial money
-			using (new WithIn(m_spacetimes[0]))
-			{
-				foreach (var acc in m_accounts)
-					m_accountingInvoker.Deposit(acc, 900.0f);
-			}
+		private void Teardown()
+		{
+			m_accountStates.Clear();
+			m_accounts.Clear();
+			m_spacetimes.Clear();
+			ServiceManager.Reset();
 		}
 
 		[Fact]
 		public void TestLocalAccountDeposit()
 		{
+			Setup();
+
 			using (new WithIn(m_spacetimes[0]))
 			{
 				m_accountingInvoker.Deposit(m_accounts[0], 900.0f);
 			}
 
 			Assert.Equal(900.0f, m_accountStates[0].Balance);
+
+			Teardown();
+		}
+
+		//[Fact]
+		public void TestMigration()
+		{
+			m_spacetimes[1].Immigrate(m_accounts[1].StateId, m_spacetimes[0].ID);
 		}
 
 		[Fact]
 		public void TestRemoteAccountDeposit()
 		{
+			Setup();
+
 			using (new WithIn(m_spacetimes[0]))
 			{
 				m_accountingInvoker.Deposit(m_accounts[1], 900.0f);
 			}
 
 			Assert.Equal(900.0f, m_accountStates[1].Balance);
+
+			Teardown();
 		}
 	}
 }

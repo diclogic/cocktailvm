@@ -387,7 +387,7 @@ namespace Cocktail
 		{
 			foreach (var sid in foreignIds)
 			{
-				var hid = NamingSvcClient.Instance.GetObjectSpaceTimeID(sid.ToString());
+				var hid = ServiceManager.LocatingService.GetObjectSpaceTimeID(sid);
 				yield return new KeyValuePair<IHId, TStateId>(hid, sid);
 			}
 		}

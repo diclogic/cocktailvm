@@ -27,8 +27,6 @@ namespace DOA
 			public ulong index;
 		}
 
-		public static NamingSvcClient Instance = new NamingSvcClient();
-
 		private Dictionary<string, Entry> m_objects = new Dictionary<string, Entry>();
 
 		public bool RegisterObject(string objName, string objType, State ptr)
