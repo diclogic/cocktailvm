@@ -153,9 +153,9 @@ namespace Cocktail.HTS
     /// </summary>
     class ITCIdentityFactory : IHIdFactory
     {
-        readonly uint INITIAL_SIZE = 32;
-        readonly uint BATCH_SIZE = 16;
-        readonly uint SEED_RATIO = 4;  // TODO: use it to replace the one seed approach
+        const uint INITIAL_SIZE = 32;
+        const uint BATCH_SIZE = 16;
+        const uint SEED_RATIO = 4;  // TODO: use it to replace the one seed approach
 
         struct FreelistEntry
         {
@@ -163,18 +163,24 @@ namespace Cocktail.HTS
             public List<ITCIdentity> seeds;
             public List<ITCIdentity> remains;
         }
+
+		uint m_batchSize;
         ITCIdentity m_root;
 		ConcurrentDictionary<itc.Identity, FreelistEntry> m_freelist;
 
-        public ITCIdentityFactory()
+		public ITCIdentityFactory()
+			: this(INITIAL_SIZE, BATCH_SIZE)
+		{
+		}
+
+        public ITCIdentityFactory(uint initialSize, uint batchSize)
         {
-			INITIAL_SIZE = 8; // For debug
-			BATCH_SIZE = 8;
+			m_batchSize = batchSize;
 
 			m_root = ITCIdentity.CreateRootID();
             m_freelist = new ConcurrentDictionary<itc.Identity, FreelistEntry>();
 
-            var entry = CausallyExpand(m_root, INITIAL_SIZE);
+            var entry = CausallyExpand(m_root, initialSize);
             entry.entryLock = new object();
             if (!m_freelist.TryAdd(m_root.GetImpl(), entry))
                 throw new ApplicationException("ITCIdentityFactory being dereferenced while constructing");

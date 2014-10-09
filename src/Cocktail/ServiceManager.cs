@@ -27,7 +27,12 @@ namespace Cocktail
 			m_pseudoSync = new DOA.PseudoSyncMgr();
 			LocatingService = m_pseudoSync;
 			SyncService = m_pseudoSync;
-			ComputeNode = new ComputeNode(0, 2);
+			ComputeNode = new ComputeNode(0, 2, DeployMode.Debug);	//< TODO: hardcoded for 2 nodes for now
+		}
+
+		public static void Init()
+		{
+			Init(ComputeNode.VMSpacetimeForUnitTest);
 		}
 
 		public static void Init(VMSpacetime vmST)
@@ -40,7 +45,7 @@ namespace Cocktail
 			m_pseudoSync.Reset();
 
 			if (reset == EReset.Strong)
-				ComputeNode = new ComputeNode(0, 2);
+				ComputeNode = new ComputeNode(0, 2, DeployMode.Debug);
 		}
     }
 }

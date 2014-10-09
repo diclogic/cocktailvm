@@ -7,3 +7,4 @@ Properties/app.manifest
 src/SDKs/log4net/
 lib/Debug/
 bin/Debug/
+src/UnitTests/Cocktail.Test/bin/
