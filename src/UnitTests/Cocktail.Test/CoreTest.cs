@@ -9,30 +9,14 @@ using Cocktail.HTS;
 
 namespace UnitTests.Cocktail
 {
-	public class CoreTestFixture: IDisposable
-	{
-		// SETUP
-		public CoreTestFixture()
-		{
 
-		}
-
-		// TEARDOWN
-		public void Dispose()
-		{
-
-		}
-	}
-
-	public class TwoSpacetimeTests : IUseFixture<CoreTestFixture>
+	public class TwoSpacetimeTests
 	{
 		IAccounting m_accountingInvoker;
 		//IHIdFactory m_idFactory;
 		List<Spacetime> m_spacetimes = new List<Spacetime>();
 		List<MonitoredAccount> m_accountStates = new List<MonitoredAccount>();
 		List<ScopedStateRef> m_accounts = new List<ScopedStateRef>();
-
-		public void SetFixture(CoreTestFixture data) { }
 
 		protected State AccountFactory(Spacetime st, IHTimestamp stamp, int index)
 		{
@@ -42,13 +26,19 @@ namespace UnitTests.Cocktail
 		public TwoSpacetimeTests()
 		{
 			m_accountingInvoker = InvocationBuilder.Build<IAccounting>();
+			ServiceManager.Init();
 		}
 
 		private void Setup()
 		{
-			ServiceManager.Init();
+			m_accountStates.Clear();
+			m_accounts.Clear();
+			m_spacetimes.Clear();
+
+			ServiceManager.Reset(EReset.Strong);
+
 			var vmST = ServiceManager.ComputeNode.VMSpacetimeForUnitTest;
-			vmST.VMBind(typeof(IAccounting), typeof(ConstrainedAccounting));
+			vmST.VMDefine(typeof(IAccounting), typeof(ConstrainedAccounting));
 
 
 			var initialST = ServiceManager.ComputeNode.CreateSpacetime();
@@ -68,14 +58,6 @@ namespace UnitTests.Cocktail
 			}
 		}
 
-		private void Teardown()
-		{
-			m_accountStates.Clear();
-			m_accounts.Clear();
-			m_spacetimes.Clear();
-			ServiceManager.Reset();
-		}
-
 		[Fact]
 		public void TestLocalAccountDeposit()
 		{
@@ -88,7 +70,6 @@ namespace UnitTests.Cocktail
 
 			Assert.Equal(900.0f, m_accountStates[0].Balance);
 
-			Teardown();
 		}
 
 		//[Fact]
@@ -97,7 +78,7 @@ namespace UnitTests.Cocktail
 			m_spacetimes[1].Immigrate(m_accounts[1].StateId, m_spacetimes[0].ID);
 		}
 
-		//[Fact]
+		[Fact]
 		public void TestRemoteAccountDeposit()
 		{
 			Setup();
@@ -109,7 +90,6 @@ namespace UnitTests.Cocktail
 
 			Assert.Equal(900.0f, m_accountStates[1].Balance);
 
-			Teardown();
 		}
 	}
 }

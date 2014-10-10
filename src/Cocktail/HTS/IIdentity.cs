@@ -207,7 +207,7 @@ namespace Cocktail.HTS
 			if (itcParent == null)
                 throw new ArgumentException("The source Id was not from this factory");
 
-			uint batchSize = Math.Max(BitOps.RoundUp((uint)count), BATCH_SIZE);
+			uint batchSize = Math.Max(BitOps.RoundUp((uint)count), m_batchSize);
 
             var entry = m_freelist.GetOrAdd(itcParent.GetImpl(), (_) =>
             {

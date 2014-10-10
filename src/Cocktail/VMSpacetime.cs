@@ -45,7 +45,7 @@ namespace Cocktail
 			return m_vm.IsDeclared(funcName);
 		}
 
-		public void VMBind(Type interf, Type impl)
+		public void VMDefine(Type interf, Type impl)
 		{
 			if (!interf.IsInterface || !impl.IsClass)
 				throw new RuntimeException(string.Format("Failed to bind interface `{0}' to implementation `{1}', one of them are disqalified"

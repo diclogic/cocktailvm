@@ -18,34 +18,49 @@ namespace Cocktail
 		public static ILocatingService LocatingService { get; private set; }
 		public static ISyncService SyncService { get; private set; }
 		public static ComputeNode ComputeNode { get; private set; }
-		public static IHIdFactory HIdFactory { get { return ComputeNode.HIdFactory; } }
 
-		private static DOA.PseudoSyncMgr m_pseudoSync; 
+		private static DOA.PseudoSyncMgr m_pseudoSync;
+		private static bool m_initialized = false;
 
 		static ServiceManager()
 		{
+		}
+
+		public static void Init(VMSpacetime vmST = null)
+		{
+			if (m_initialized)
+				return;
+
+			m_initialized = true;
+
 			m_pseudoSync = new DOA.PseudoSyncMgr();
 			LocatingService = m_pseudoSync;
 			SyncService = m_pseudoSync;
-			ComputeNode = new ComputeNode(0, 2, DeployMode.Debug);	//< TODO: hardcoded for 2 nodes for now
-		}
+			ReinitComputeNode();
 
-		public static void Init()
-		{
-			Init(ComputeNode.VMSpacetimeForUnitTest);
-		}
+			if (vmST == null)
+				vmST = ComputeNode.VMSpacetimeForUnitTest;
 
-		public static void Init(VMSpacetime vmST)
-		{
 			m_pseudoSync.Initialize(vmST);
 		}
 
-		public static void Reset(EReset reset = EReset.Weak)
+		public static void Reset(EReset reset = EReset.Weak, VMSpacetime vmST = null)
 		{
-			m_pseudoSync.Reset();
+			if (reset == EReset.Weak)
+				m_pseudoSync.Reset();
+			else if (reset == EReset.Strong)
+			{
+				m_pseudoSync = null;
+				LocatingService = null;
+				SyncService = null;
+				m_initialized = false;
+				Init(vmST);
+			}
+		}
 
-			if (reset == EReset.Strong)
-				ComputeNode = new ComputeNode(0, 2, DeployMode.Debug);
+		private static void ReinitComputeNode()
+		{
+			ComputeNode = new ComputeNode(0, 2, DeployMode.Debug);	//< TODO: hardcoded for 2 nodes for now
 		}
     }
 }

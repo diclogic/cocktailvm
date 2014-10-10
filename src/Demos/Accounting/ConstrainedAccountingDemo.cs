@@ -18,7 +18,7 @@ namespace Demos.Accounting
 
 		public override void Init(AABB worldBox)
 		{
-			m_vmST.VMBind(typeof(IAccounting), typeof(ConstrainedAccounting));
+			m_vmST.VMDefine(typeof(IAccounting), typeof(ConstrainedAccounting));
 			base.Init(worldBox);
 
 			RegisterAction(2, "transfer");

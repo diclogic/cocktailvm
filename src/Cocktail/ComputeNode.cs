@@ -10,6 +10,7 @@ namespace Cocktail
 	{
 		Debug,
 		UnitTest,
+		Cluster,
 	}
 
 	public class ComputeNode

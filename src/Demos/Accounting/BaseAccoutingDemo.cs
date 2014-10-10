@@ -37,7 +37,7 @@ namespace Demos.Accounting
 
 			//m_namingSvc = NamingSvcClient.Instance;
 			m_accountingInvoker = InvocationBuilder.Build<IAccounting>();
-			m_idFactory = ServiceManager.HIdFactory;
+			m_idFactory = ServiceManager.ComputeNode.HIdFactory;
 			m_vmST = new VMSpacetime(m_idFactory.CreateFromRoot(), m_idFactory);
 		}
 

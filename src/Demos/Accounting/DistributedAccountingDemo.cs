@@ -19,7 +19,7 @@ namespace Demos.Accounting
 
 		public override void Init(AABB worldBox)
 		{
-			m_vmST.VMBind(typeof(IAccounting), typeof(Accounting));
+			m_vmST.VMDefine(typeof(IAccounting), typeof(Accounting));
 			base.Init(worldBox);
 		}
 
