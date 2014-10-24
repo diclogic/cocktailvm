@@ -18,6 +18,24 @@ namespace Cocktail.Interp
 	public class StateParamInst : StateParam
 	{
 		public StateRef arg;
+
+		public KeyValuePair<object, int> ConvertCocktailToCSharp(IScope scope)
+		{
+			var spi = this;
+			var stateRefType = spi.arg.GetType();
+			if (typeof(DirectStateRef).IsAssignableFrom(stateRefType))
+			{
+				var ret = (spi.arg as DirectStateRef).GetObject(null);
+				return new KeyValuePair<object, int>(ret, spi.index);
+			}
+			else if (typeof(ScopedStateRef).IsAssignableFrom(stateRefType))
+			{
+				var ret = (spi.arg as ScopedStateRef).GetObject(scope);
+				return new KeyValuePair<object, int>(ret, spi.index);
+			}
+
+			throw new ArgumentOutOfRangeException("Unknown StateRef");
+		}
 	}
 
 	public class StateParamComparer : IEqualityComparer<StateParam>

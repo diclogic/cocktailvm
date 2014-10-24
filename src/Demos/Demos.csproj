@@ -57,6 +57,7 @@
   <ItemGroup>
     <Compile Include="Accounting\Accounting.cs" />
     <Compile Include="Accounting\BaseAccoutingDemo.cs" />
+    <Compile Include="Accounting\CheckBounceDemo.cs" />
     <Compile Include="Accounting\ConstrainedAccountingDemo.cs" />
     <Compile Include="Collision\Newton.cs" />
     <Compile Include="Accounting\DistributedAccountingDemo.cs" />

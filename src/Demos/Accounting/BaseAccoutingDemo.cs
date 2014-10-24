@@ -22,7 +22,6 @@ namespace Demos.Accounting
 		protected AABB m_worldBox;
 		protected double m_accumulate = 0;
 		protected List<Spacetime> m_spacetimes = new List<Spacetime>();
-		protected IHIdFactory m_idFactory;
 		protected VMSpacetime m_vmST;
 		//protected NamingSvcClient m_namingSvc;
 		protected IAccounting m_accountingInvoker;
@@ -33,19 +32,16 @@ namespace Demos.Accounting
 		public BaseAccountingDemo()
 		{
 			// reset all global states, to allow model switching
-			ServiceManager.Reset();
+			ServiceManager.Init();
+			m_vmST = ServiceManager.ComputeNode.VMSpacetimeForUnitTest;
 
 			//m_namingSvc = NamingSvcClient.Instance;
 			m_accountingInvoker = InvocationBuilder.Build<IAccounting>();
-			m_idFactory = ServiceManager.ComputeNode.HIdFactory;
-			m_vmST = new VMSpacetime(m_idFactory.CreateFromRoot(), m_idFactory);
 		}
 
 		public override void Init(AABB worldBox)
 		{
 			m_worldBox = worldBox;
-
-			ServiceManager.Init(m_vmST);
 
 			if (!m_vmST.VMExist(typeof(IAccounting)))
 				throw new ApplicationException("Accounting functions are not declared in VM yet");
@@ -53,8 +49,9 @@ namespace Demos.Accounting
 			// --- init demo objects ---
 
 			{
-				var initialST = new Spacetime(m_idFactory.CreateFromRoot(), ITCEvent.CreateZero(), m_idFactory);
-				var secondST = new Spacetime(m_idFactory.CreateFromRoot(), ITCEvent.CreateZero(), m_idFactory);
+				var idFactory = ServiceManager.ComputeNode.HIdFactory;
+				var initialST = new Spacetime(idFactory.CreateFromRoot(), ITCEvent.CreateZero(), idFactory);
+				var secondST = new Spacetime(idFactory.CreateFromRoot(), ITCEvent.CreateZero(), idFactory);
 				m_spacetimes.AddRange(new[] { initialST, secondST });
 			}
 

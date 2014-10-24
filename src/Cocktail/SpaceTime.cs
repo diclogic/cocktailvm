@@ -72,16 +72,25 @@ namespace Cocktail
 			}
 		}
 
+		private struct DeferredExecution
+		{
+			public string FunctionName;
+			public IEnumerable<KeyValuePair<string,StateRef>> stateParams;	//< can we preparse it?
+			public IEnumerable<object> constArgs;
+		}
+
 		private static IStdLib m_stdlib = InvocationBuilder.Build<IStdLib>("Cocktail");
 
 		// ========== components ===============
 		protected SpacetimeStorage m_storageComponent;
+		// =====================================
 
         private IHIdFactory m_idFactory;
         private IHTimestamp m_currentTime;
 		private List<RedoEntry> m_RedoList = new List<RedoEntry>();
 		private object m_executionLock = new object();
-		private SortedList<IHEvent, ExecutionFraction> m_incomingExecutions = new SortedList<IHEvent, ExecutionFraction>();
+		private Queue<DeferredExecution> m_deferredExecutions = new Queue<DeferredExecution>();
+
 		private IHEvent m_executingEvent;
 		private IHId m_pullRequestedBy = null;
 		protected VMState m_vm;
@@ -89,6 +98,10 @@ namespace Cocktail
 		public IHId ID { get { return m_currentTime.ID; } }
 		public IHEvent LatestEvent { get { return m_currentTime.Event; } }
 		public TStateId StorageSID { get { return m_storageComponent.StateId; } }
+
+		// This is for execution-based replication/redundancy.
+		// not used yet
+		private SortedList<IHEvent, ExecutionFraction> m_incomingExecutions = new SortedList<IHEvent, ExecutionFraction>();
 
 
         public Spacetime(IHTimestamp stamp, IHIdFactory idFactory)
@@ -208,7 +221,7 @@ namespace Cocktail
 			if (state == null)
 				return StateSnapshot.CreateNull(stateId);
 
-			return state.Snapshot();	
+			return state.Snapshot();
 		}
 
 		///// <summary>
@@ -297,6 +310,15 @@ namespace Cocktail
 			}
 		}
 
+		public void DeferExecute(string funcName, IEnumerable<KeyValuePair<string, StateRef>> stateParams, params object[] constArgs)
+		{
+			DeferredExecution deferred;
+			deferred.FunctionName = funcName;
+			deferred.stateParams = stateParams;
+			deferred.constArgs = constArgs;
+			m_deferredExecutions.Enqueue(deferred);
+		}
+
 		public bool Execute(string funcName, IEnumerable<KeyValuePair<string, StateRef>> stateParams, params object[] constArgs)
 		{
 			if (this == null)
@@ -304,8 +326,18 @@ namespace Cocktail
 
 			lock (m_executionLock)
 			{
-				return ExecuteArgs(funcName, stateParams, constArgs);
+				var bOK = ExecuteArgs(funcName, stateParams, constArgs);
+				if (!bOK)
+					return false;
+
+				// ------------ start deferred chronon --------------
+				while (m_deferredExecutions.Count > 0)
+				{
+					var deferred = m_deferredExecutions.Dequeue();
+					ExecuteArgs(deferred.FunctionName, deferred.stateParams, deferred.constArgs);
+				}
 			}
+			return true;
 		}
 
 		protected bool ExecuteArgs(string funcName, IEnumerable<KeyValuePair<string,StateRef>> stateParams, IEnumerable<object> constArgs)

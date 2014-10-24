@@ -164,17 +164,17 @@ namespace Cocktail.Interp
 											, MakeSignatureString(stateParams, constTypes) ));
 
 			// --------- Execute --------------
-			func.Exec(scope, GenStateParamInsts(states), constArgs);
+			var argList = func.Form.Fill(scope, GenStateParamInsts(states), constArgs);
+			func.Exec(argList.args);
 
 			// --------- Fire Inline Triggers -------
 			// the result of inline trigger is in same chronon
 			// the trigger can only do:
 			// 1) access/modify the state it belongs to
 			// 2) add new entry to the pending chronon list of the executing ST
-			// 3) fail the chronon
-			foreach (var sref in states)
+			// -3) fail the chronon-
+			foreach (var state in argList.rwStates)
 			{
-				var state = sref.Value.GetObject(scope);
 				state.FireInlineTriggers();
 			}
 
@@ -183,7 +183,7 @@ namespace Cocktail.Interp
 
 		// Internal
 
-        FunctionSignature Find(string name, IEnumerable<StateParam> stateParams, IEnumerable<Type> constParams )
+		FunctionSignature Find(string name, IEnumerable<StateParam> stateParams, IEnumerable<Type> constParams)
         {
             List<FunctionSignature> funcGroup;
             if (!m_declGroups.TryGetValue(name, out funcGroup))

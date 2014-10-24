@@ -7,6 +7,12 @@ using System.Threading;
 
 namespace Cocktail
 {
+	public enum TriggerConditionType
+	{
+		Changed,
+		Customized,
+	}
+
 	public class StaticTriggerAttribute : Attribute
 	{
 		public Action<State> Trigger { get; set; }
@@ -39,6 +45,17 @@ namespace Cocktail
 	{
 		protected Dictionary<int, StateTrigger> m_triggers = new Dictionary<int,StateTrigger>();
 		int m_idx = 0;
+
+		// Well-known conditions
+		private readonly Func<State, bool> s_Changed = (s) => true;	
+
+		public int RegisterInlineTrigger(TriggerConditionType type, Action<State> response)
+		{
+			if (type == TriggerConditionType.Changed)
+				return RegisterInlineTrigger(response, s_Changed);
+
+			throw new ArgumentOutOfRangeException("Unsupported trigger condition type");
+		}
 
 		public int RegisterInlineTrigger(Action<State> response, Func<State, bool> condition)
 		{

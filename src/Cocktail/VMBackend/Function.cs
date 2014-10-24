@@ -6,8 +6,6 @@ using System.Linq;
 namespace Cocktail.Interp
 {
 
-
-
     /// <summary>
     /// the class for function instances that matches a form
     /// </summary>
@@ -26,17 +24,10 @@ namespace Cocktail.Interp
 			// TODO: need Cocktail to C# invocation adapter
 			m_fn = (args) => methodInfo.Invoke(null, args);
 		}
-		
-		public void Exec(IScope scope, IEnumerable<StateParamInst> states, IEnumerable<object> constArgs)
-		{
-			if (!Form.Check(states, constArgs))
-				throw new ApplicationException("The invocation doesn't match the form of the event declaration");
-			var argList = Form.GenArgList(scope, states, constArgs).ToArray();
-			m_fn(argList);
 
-			// TODO: remove it, this is not how we sync states
-			foreach (var stateInst in states)
-				stateInst.arg.Sync();
+		public void Exec(object[] argList)
+		{
+			m_fn(argList);
 		}
 
 		//public static Function Make<P1>(Action<IEnumerable<StateParam>,P1> fn)
@@ -44,6 +35,12 @@ namespace Cocktail.Interp
 		//    var retval = new Function(fn);
 		//    return retval;
 		//}
+	}
+
+	public struct ArgsMetainfo
+	{
+		public object[] args;
+		public IEnumerable<State> rwStates;
 	}
 
 	public sealed class FunctionForm : IComparable<FunctionForm>, IEquatable<FunctionForm>
@@ -67,8 +64,12 @@ namespace Cocktail.Interp
             return "";
         }
 
-		public IEnumerable<object> GenArgList(IScope scope, IEnumerable<StateParamInst> states, IEnumerable<object> constArgs)
+		public ArgsMetainfo Fill(IScope scope, IEnumerable<StateParamInst> states, IEnumerable<object> constArgs)
 		{
+			ArgsMetainfo retval;
+			if (!Check(states, constArgs))
+				throw new ApplicationException("The invocation doesn't match the form of the event declaration");
+
 			IEnumerable<KeyValuePair<object,int>> stateArgs = states.Select<StateParamInst, StateParamInst>((spi) =>
 				{
 					StateParam sp;
@@ -76,7 +77,15 @@ namespace Cocktail.Interp
 						throw new ApplicationException(string.Format("can't find state param '{0}'", spi.name));
 					var newspi = new StateParamInst() { name = sp.name, type = sp.type, index = sp.index, arg = spi.arg };
 					return newspi;
-				}).Select((spi) => ConvertCocktailToCSharp(scope, spi));
+				}).Select((spi) => spi.ConvertCocktailToCSharp(scope));
+
+			retval.args = SortArgList(stateArgs, constArgs).ToArray();
+			retval.rwStates = stateArgs.Select(kv => (State)kv.Key);
+			return retval;
+		}
+
+		public IEnumerable<object> SortArgList(IEnumerable<KeyValuePair<object,int>> stateArgs, IEnumerable<object> constArgs)
+		{
 			bool bStateRemain, bConstRemain;
 			var stateEnumerator = stateArgs.GetEnumerator();
 			var constEnumerator = constArgs.GetEnumerator();
@@ -105,23 +114,6 @@ namespace Cocktail.Interp
 				++idx;
 			}
 			while (bStateRemain || bConstRemain);
-		}
-
-		private static KeyValuePair<object, int> ConvertCocktailToCSharp(IScope scope, StateParamInst spi)
-		{
-			var stateRefType = spi.arg.GetType();
-			if (typeof(DirectStateRef).IsAssignableFrom(stateRefType))
-			{
-				var ret = (spi.arg as DirectStateRef).GetObject(null);
-				return new KeyValuePair<object, int>(ret, spi.index);
-			}
-			else if (typeof(ScopedStateRef).IsAssignableFrom(stateRefType))
-			{
-				var ret = (spi.arg as ScopedStateRef).GetObject(scope);
-				return new KeyValuePair<object, int>(ret, spi.index);
-			}
-
-			throw new ArgumentOutOfRangeException("Unknown StateRef");
 		}
 
         public bool Check(IEnumerable<StateParam> states, IEnumerable<Type> constParams)
