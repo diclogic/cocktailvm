@@ -19,7 +19,7 @@ namespace Cocktail
 
 	public class SpacetimeStorage : State, IScope
 	{
-		struct _StateRef { public TStateId sid; public string refType; }
+		public struct _StateRef { public TStateId sid; public string refType; }
 
 		// just want to make it non-commutative
 		[StateField(PatchKind = FieldPatchCompatibility.Invalid)]

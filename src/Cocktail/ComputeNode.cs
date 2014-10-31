@@ -60,7 +60,7 @@ namespace Cocktail
 		public Spacetime CreateSpacetime(IHEvent event_)
 		{
 			var st = new Spacetime(CreateHid(), event_, HIdFactory);
-			ServiceManager.LocatingService.RegisterSpaceTime(st);
+			ServiceManager.LocatingService.RegisterSpaceTime(st, event_);
 			ServiceManager.SyncService.PullFromVmSt(st.ID);
 			return st;
 		}

@@ -54,7 +54,6 @@ namespace UnitTests.Cocktail
 			{
 				// firstly create into same ST then we migrate one to another ST
 				var newAccount = m_spacetimes[ii].CreateState((st, stamp) => AccountFactory(st, stamp, ii));
-				//m_namingSvc.RegisterObject(newAccount.StateId.ToString(), newAccount.GetType().ToString(), newAccount);
 				m_accountStates.Add((MonitoredAccount)newAccount);
 				m_accounts.Add(new ScopedStateRef(newAccount.StateId, newAccount.GetType().ToString()));
 			}

@@ -57,7 +57,7 @@ namespace Demos.Accounting
 
 			// fake the globally existing SyncManager
 			foreach (var ST in m_spacetimes)
-				ServiceManager.LocatingService.RegisterSpaceTime(ST);
+				ServiceManager.LocatingService.RegisterSpaceTime(ST, null);
 
 			// must pull new VM to use IAccounting
 			foreach (var ST in m_spacetimes)

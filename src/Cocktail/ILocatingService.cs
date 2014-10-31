@@ -32,7 +32,7 @@ namespace Cocktail
 	}
 	public interface ILocatingService
 	{
-		void RegisterSpaceTime(Spacetime st);
+		void RegisterSpaceTime(Spacetime st, IHEvent _event);
 		TStateId? GetSpacetimeStorageSID(IHId stHid);
 		SpacetimeSnapshot? GetSpacetime(IHId id, IHEvent evtAck);
 

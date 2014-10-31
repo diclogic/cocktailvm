@@ -19,6 +19,9 @@ namespace DOA
 
 		private NamingSvcClient m_naming;
 
+		private Dictionary<IHId, IHEvent> m_latestUpdateForLocalStorages;
+		private Dictionary<TStateId, IHId> m_localStates;
+
 		internal PseudoSyncMgr()
 		{
 			m_naming = new NamingSvcClient();
@@ -49,11 +52,15 @@ namespace DOA
 			return m_naming.GetObjectSpaceTimeID(sid.ToString());
 		}
 
-		public void RegisterSpaceTime(Spacetime st)
+		public void RegisterSpaceTime(Spacetime st, IHEvent event_)
 		{
 			lock (m_lock)
 			{
 				m_spaceTimes.Add(st.ID, st);
+				var storage = st.ExportStateSnapshot(st.StorageSID, event_);
+				var states = storage.Fields.First( field => field.Name == "m_nativeStates").Value as SpacetimeStorage._StateRef[];
+				foreach (var s in states)
+					m_localStates.Add(s.sid, st.ID);
 			}
 		}
 
