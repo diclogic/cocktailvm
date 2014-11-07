@@ -11,6 +11,12 @@ namespace DOA
 
 	public class PseudoSyncMgr : ISyncService, ILocatingService
 	{
+		private struct LocalStorageMeta
+		{
+			public IHEvent LatestUpdate;
+			public SpacetimeStorage Storage;
+		}
+
 		private Dictionary<IHId, Spacetime> m_spaceTimes = new Dictionary<IHId, Spacetime>();
 		private object m_lock = new object();
 
@@ -19,7 +25,7 @@ namespace DOA
 
 		private NamingSvcClient m_naming;
 
-		private Dictionary<IHId, IHEvent> m_latestUpdateForLocalStorages;
+		private Dictionary<IHId, LocalStorageMeta> m_localStorages;
 		private Dictionary<TStateId, IHId> m_localStates;
 
 		internal PseudoSyncMgr()
@@ -57,10 +63,17 @@ namespace DOA
 			lock (m_lock)
 			{
 				m_spaceTimes.Add(st.ID, st);
-				var storage = st.ExportStateSnapshot(st.StorageSID, event_);
-				var states = storage.Fields.First( field => field.Name == "m_nativeStates").Value as SpacetimeStorage._StateRef[];
-				foreach (var s in states)
-					m_localStates.Add(s.sid, st.ID);
+				m_localStorages.Add(st.ID, new LocalStorageMeta() { LatestUpdate = event_, Storage = st.StorageComponent });
+			}
+		}
+
+		public void UpdateLocalStorage(IHId hid, IHEvent event_)
+		{
+			var meta = m_localStorages[hid];
+			meta.LatestUpdate = event_;
+			foreach (var state in meta.Storage)
+			{
+				state
 			}
 		}
 

@@ -99,6 +99,8 @@ namespace Cocktail
 		public IHEvent LatestEvent { get { return m_currentTime.Event; } }
 		public TStateId StorageSID { get { return m_storageComponent.StateId; } }
 
+		internal SpacetimeStorage StorageComponent { get { return m_storageComponent; } }
+
 		// This is for execution-based replication/redundancy.
 		// not used yet
 		private SortedList<IHEvent, ExecutionFraction> m_incomingExecutions = new SortedList<IHEvent, ExecutionFraction>();
