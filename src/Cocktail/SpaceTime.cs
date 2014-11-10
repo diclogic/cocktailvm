@@ -244,6 +244,8 @@ namespace Cocktail
 		//    m_currentTime.
 		//}
 
+		// TODO: support stable split
+		// if a ST being split, merged, and split again it's states should have stable HID like before
 		/// <summary>
 		/// Split the spacetime into many pieces so that each state has it's own spacetime
 		/// </summary>
@@ -616,6 +618,8 @@ namespace Cocktail
 
 		#endregion
 
+		// TODO: support Pinned Replica design
+		// is this a pinned replica? can 
 		internal PrePullRequestResult PrePullRequest(IHId idRequester, IHEvent evtOriginal, IEnumerable<TStateId> affectedStates)
 		{
 			if (affectedStates.FirstOrDefault().Equals(default(TStateId)))

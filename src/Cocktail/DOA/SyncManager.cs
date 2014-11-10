@@ -25,8 +25,8 @@ namespace DOA
 
 		private NamingSvcClient m_naming;
 
-		private Dictionary<IHId, LocalStorageMeta> m_localStorages;
-		private Dictionary<TStateId, IHId> m_localStates;
+		private Dictionary<IHId, LocalStorageMeta> m_localStorages = new Dictionary<IHId,LocalStorageMeta>();
+		private Dictionary<TStateId, IHId> m_localStates = new Dictionary<TStateId,IHId>();
 
 		internal PseudoSyncMgr()
 		{
@@ -71,9 +71,9 @@ namespace DOA
 		{
 			var meta = m_localStorages[hid];
 			meta.LatestUpdate = event_;
-			foreach (var state in meta.Storage)
+			foreach (var state in meta.Storage.GetNativeStates())
 			{
-				state
+				m_localStates[state.StateId] = hid;
 			}
 		}
 

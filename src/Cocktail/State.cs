@@ -1,4 +1,12 @@
-﻿using System;
+﻿// TODO: Pinned Replica
+// every state has one main copy and a constant amount of pinned replicas in different STs.
+// replicas that are not pinned are not allowed to be written locally, they must route the write operation to the ST that contains the main copy
+// pinned replica can be promoted to main copy as a way of migration
+// pinned replicas of a certain state should be spread onto different compute nodes for safety;
+// upon a node failure all the main copies on that node will be re-chosen
+
+
+using System;
 using System.IO;
 using System.Linq;
 using Cocktail.HTS;
@@ -20,11 +28,20 @@ namespace Cocktail
 		private StatePatch m_pendingPatch;
 		private readonly StatePatchMethod m_patchMethod;
 
-
-
 		public TStateId StateId { get; protected set; }	//< to identify a state
 		public IHId SpacetimeID { get; private set; }
+
+		// TODO: let the tree-style version vector only contain versions of pinned replicas
+		/// <summary>
+		/// LatestUpdate is similar to a version vector that contains versions of all replicas of the state.
+		/// however each increment on the version in each cell don't necessarily mean an update (since we share ST);
+		/// but "v1 > v2" determins v1 is newer
+		/// </summary>
 		public IHEvent LatestUpdate { get; private set; }
+		/// <summary>
+		/// Rev tells how many updates are actually happened on the state.
+		/// it's useful to debugging or something e.g. triggers on value changing that need to be fired as many times as update happened
+		/// </summary>
 		public long Rev { get; private set; }
 
 		public State(IHTimestamp stamp)
