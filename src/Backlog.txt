@@ -26,8 +26,8 @@ h1. Backlog (Jia Li)
 # Nesting invocation
 #* Priority: 1
 #* Targets:
-#** a chronon can call another chronon
-#** a function can be either chronon or non-chronon 
+#** a chronon can call other chronons as sub-chronons
+#** a chronon can generate deferred chronons
 
 # Readonly states as parameters
 #* Priority: 1
@@ -36,7 +36,7 @@ h1. Backlog (Jia Li)
 #* Priority: 1
 #* Targets:
 #** the ability of states to migrate to another Spacetime(ST)
-#** such change to Spacetimes(departuring and arriving) should also be tracked in the same way as other chronons
+#** such change to Spacetimes(departing and arriving) should also be tracked in the same way as other chronons
 #** 
 
 # Conditional patch/sync flag
@@ -50,16 +50,32 @@ h1. Backlog (Jia Li)
 # Write/out-only state parameters
 #* Priority: 5
 
-# Defragment of ITC
+# ITC Defragmentation
 #* Priority: 5
 #* Desc:
 #** because of the nature of the ITC (it's a binary tree), ITC utilizes this fact to reduce entropy of unnecessary versioning detail
 #** over thousands of state migrations the tree would contain lots of fragment
 #** the difficulty here is: the ITC tree is global, so how can we rehash it efficiently 
 
-# Spacetime replica
-#* Priority: 9
+# State Replicas
+#* Priority: 3
 #* Desc:
-#** having replica can help to achieve necessary data redundency for failover and parallel readable source
+#** having replica can help to achieve necessary data redundancy for fail-over and parallel readable source
+#** Option 1: pinned replicas
+#** every state can have finite number of pinned replicas, with configurable lower bound and upper bound
+#** all other non-pinned replicas must route chronons to one of the pinned replicas (or just the main copy?)
+#** there are heart beats between pinned replicas to keep them sync
+#** a timed out pinned replica lost its privilege and will be demoted to a common replica
+#** only main copy and pinned replicas are allowed to be written
 
+# managed types
+#* Priority: 2
+#* Desc:
+#** VM also manage types
+#** type changes are propagated with logic that can handle them
+
+# use dynamic as data structure implementation
+#* Priority: ?
+#* Desc:
+#** using dynamic type (weak type) in implementation provides the flexibility to allow VM change type definitions while updating certain logic
 
