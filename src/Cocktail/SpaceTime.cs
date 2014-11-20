@@ -79,6 +79,13 @@ namespace Cocktail
 			public IEnumerable<object> constArgs;
 		}
 
+		private struct ExecStackEntry
+		{
+			public string FunctionName;
+			public string FileName;
+			public string LineNumber;
+		}
+
 		private static IStdLib m_stdlib = InvocationBuilder.Build<IStdLib>("Cocktail");
 
 		// ========== components ===============
@@ -92,6 +99,7 @@ namespace Cocktail
 		private Queue<DeferredExecution> m_deferredExecutions = new Queue<DeferredExecution>();
 
 		private IHEvent m_executingEvent;
+		private Stack<ExecStackEntry> m_executionStack = new Stack<ExecStackEntry>();
 		private IHId m_pullRequestedBy = null;
 		protected VMState m_vm;
 
@@ -151,7 +159,7 @@ namespace Cocktail
 
 		public State CreateState(Func<Spacetime, IHTimestamp, State> constructor)
         {
-            var evtOriginal = BeginChronon();
+			var evtOriginal = BeginChronon(new ExecStackEntry() { FunctionName = "<Cocktail.Spacetime.CreateState>"});
 			var evtFinal = evtOriginal.Advance(ID);
             var newState = constructor(this, m_currentTime);
 			m_storageComponent.AddNativeState(newState);
@@ -347,7 +355,7 @@ namespace Cocktail
 		protected bool ExecuteArgs(string funcName, IEnumerable<KeyValuePair<string,StateRef>> stateParams, IEnumerable<object> constArgs)
 		{
 			IHEvent evtOriginal, evtFinal;
-			while ((evtOriginal = BeginChronon()) == null) ;
+			evtOriginal = BeginChronon(new ExecStackEntry() { FunctionName = funcName });
 			evtFinal = evtOriginal;
 			var redo = new RedoEntry();
 
@@ -567,17 +575,27 @@ namespace Cocktail
 		//    return event_;
 		//}
 
+		/// <summary>
+		/// Start a new event or embed into an executing event
+		/// </summary>
 		private IHEvent BeginChronon()
 		{
 			var retval = m_currentTime;
 			var oldVal = Interlocked.CompareExchange(ref m_executingEvent, retval.Event, null);
 			if (oldVal != null)
-				return null;
+				return oldVal;
 
 			Log.Info(Log.CHRONON, "[{0}] Begin {1}", retval.ID.ToString(), retval.Event.ToString());
 
 			// pull don't necessarily have event increment on local component as long as the final result event is identifiable (by the component of external ST)
 			return retval.Event;
+		}
+
+		private IHEvent BeginChronon(ExecStackEntry currentCall)
+		{
+			var retval = BeginChronon();
+			m_executionStack.Push(currentCall);
+			return retval;
 		}
 
 		private void CommitChronon(IHEvent evtOriginal, IHEvent evtFinal, IEnumerable<State> states, RedoEntry redo)
